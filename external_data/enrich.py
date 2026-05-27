@@ -23,6 +23,33 @@ from .qcc_client import (
 )
 
 
+def clean_qcc_payload(qcc: dict[str, Any] | None) -> dict[str, Any]:
+    """Reduce the raw qcc block to the five cleaned sections the user wants."""
+    qcc = qcc or {}
+    company = qcc.get("company") or {}
+    risk = qcc.get("risk") or {}
+
+    def _data(block: dict[str, Any], tool: str) -> Any:
+        item = block.get(tool) or {}
+        if not isinstance(item, dict):
+            return None
+        return item.get("data")
+
+    cleaned: dict[str, Any] = {
+        "registration_info": _data(company, "get_company_registration_info") or {},
+        "shareholdinfo": _data(company, "get_shareholder_info") or {},
+        "controller": _data(company, "get_actual_controller") or {},
+        "investments": _data(company, "get_external_investments") or {},
+        "risk": {
+            "business_exception": _data(risk, "get_business_exception") or {},
+            "administrative_penalty": _data(risk, "get_administrative_penalty") or {},
+            "judgment_debtor_info": _data(risk, "get_judgment_debtor_info") or {},
+            "dishonest_info": _data(risk, "get_dishonest_info") or {},
+        },
+    }
+    return {k: v for k, v in cleaned.items() if v}
+
+
 def has_qcc_config(path: str | Path | None = None) -> bool:
     """Cheap probe used by main.py to decide whether to print the enrichment banner."""
     return load_qcc_config(path) is not None
@@ -104,6 +131,7 @@ def enrich(cleaned: dict[str, Any], *, config_path: str | Path | None = None) ->
     qcc_block["search_key"] = search_key
     qcc_block["company"] = pack["company"]
     qcc_block["risk"] = pack["risk"]
+    qcc_block["cleaned"] = clean_qcc_payload(qcc_block)
 
     ok_company = sum(1 for r in pack["company"].values() if r.get("status") == "ok")
     ok_risk = sum(1 for r in pack["risk"].values() if r.get("status") == "ok")

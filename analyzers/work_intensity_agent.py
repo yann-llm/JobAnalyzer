@@ -22,9 +22,12 @@ def build_work_intensity_messages(
         cleaned,
         focus_hint="评估工作强度与压力源",
         candidate_profile=candidate_profile,
+        source_scope="work_intensity",
     )
     system_prompt = (
         "你是专业的招聘信息分析助手，擅长从职位描述里捕捉工作强度与压力源信号。"
+        "你独占工时、加班、压力源、oncall、出差和节奏判断；不要分析薪酬竞争力、公司财务或法律合规。"
+        "请只使用 `sections.work_intensity`、`sections.compensation`、`sections.overview`、`quick_fields` 和可选的 `candidate_profile`。"
         "只输出JSON对象，不要输出多余文本。所有结论必须来源于输入，宁可标注`数据不足`也不要编造。"
     )
     user_static = (
@@ -109,5 +112,6 @@ def analyze_work_intensity(
             cleaned,
             focus_hint="评估工作强度与压力源",
             candidate_profile=candidate_profile,
+            source_scope="work_intensity",
         ),
     }

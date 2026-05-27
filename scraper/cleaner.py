@@ -41,6 +41,25 @@ _BUSINESS_LABELS = {
     "business_status": ("经营状态", "登记状态"),
     "registered_capital": ("注册资金", "注册资本"),
 }
+_SECTION_HEADINGS = (
+    "职位描述",
+    "岗位职责",
+    "工作职责",
+    "任职要求",
+    "职位要求",
+    "必须具备",
+    "加分项",
+    "不适合的人",
+    "岗位福利",
+    "公司介绍",
+    "工商信息",
+    "工作地址",
+    "竞争力分析",
+    "更多职位",
+    "精选职位",
+    "看过该职位的人还看了",
+    "BOSS 安全提示",
+)
 
 
 def _normalize_whitespace(text: str) -> str:
@@ -215,6 +234,119 @@ def _collect_labeled_html_fields(root: Any) -> dict[str, str]:
     return info
 
 
+def _lines(text: str) -> list[str]:
+    return [line.strip() for line in (text or "").splitlines() if line.strip()]
+
+
+def _extract_section_text(
+    body_text: str,
+    start_labels: tuple[str, ...],
+    stop_labels: tuple[str, ...] = _SECTION_HEADINGS,
+) -> str | None:
+    lines = _lines(body_text)
+    start_idx: int | None = None
+    for idx, line in enumerate(lines):
+        if line in start_labels:
+            start_idx = idx + 1
+            break
+    if start_idx is None:
+        return None
+    values: list[str] = []
+    for offset, line in enumerate(lines[start_idx:]):
+        if line in stop_labels and values:
+            break
+        next_line = lines[start_idx + offset + 1] if start_idx + offset + 1 < len(lines) else ""
+        if values and ("活跃" in next_line or next_line in {"HR", "人事", "招聘者"}):
+            break
+        if line in {"查看全部", "展开", "点击查看地图", "微信扫码分享 举报"}:
+            continue
+        values.append(line)
+    return _normalize_whitespace("\n".join(values)) if values else None
+
+
+def _extract_title_salary_location_from_header(body_text: str) -> dict[str, str | None]:
+    lines = _lines(body_text)
+    info: dict[str, str | None] = {"job_title": None, "salary": None, "job_location": None}
+    for idx, line in enumerate(lines[:40]):
+        salary = _first_match(_SALARY_RE, line, "salary")
+        if not salary:
+            continue
+        title = line.replace(salary, "").strip(" -_｜|")
+        info["job_title"] = title or None
+        info["salary"] = salary
+        if idx + 1 < len(lines):
+            parts = lines[idx + 1].split()
+            if parts:
+                info["job_location"] = parts[0]
+        break
+    return info
+
+
+def _extract_job_address(body_text: str) -> str | None:
+    text = _extract_section_text(body_text, ("工作地址",), ("更多职位", "精选职位", "看过该职位的人还看了", "BOSS 安全提示"))
+    if not text:
+        return None
+    lines = [line for line in _lines(text) if line != "点击查看地图"]
+    return "\n".join(lines) if lines else None
+
+
+def _extract_job_description_from_html(html: str) -> str | None:
+    if not html:
+        return None
+    soup = BeautifulSoup(html, "lxml")
+    candidates = [
+        soup.select_one(".job-detail-section .job-sec-text"),
+        soup.select_one(".job-detail-section .job-sec-text.fold-text"),
+        soup.select_one(".job-sec-text"),
+    ]
+    for node in candidates:
+        if node:
+            text = _normalize_whitespace(node.get_text("\n", strip=True))
+            if text:
+                return text
+    return None
+
+
+def _business_info_chinese(info: dict[str, Any]) -> dict[str, Any]:
+    mapping = {
+        "company_name": "公司名称",
+        "unified_social_credit_code": "统一社会信用代码",
+        "legal_representative": "法定代表人",
+        "established_date": "成立日期",
+        "company_type": "企业类型",
+        "business_status": "经营状态",
+        "registered_capital": "注册资金",
+        "company_detail_url": "公司详情页",
+    }
+    return {label: info[key] for key, label in mapping.items() if info.get(key)}
+
+
+def _clean_page_content(page: JobPageContent, body_text: str, quick_fields: dict[str, Any], business_info: dict[str, Any]) -> dict[str, Any]:
+    header = _extract_title_salary_location_from_header(body_text)
+    requirements_line = None
+    if header.get("job_location"):
+        for line in _lines(body_text)[:50]:
+            if header["job_location"] and line.startswith(str(header["job_location"])):
+                requirements_line = line
+                break
+    requirement_parts = requirements_line.split() if requirements_line else []
+
+    return {
+        "职位名称": header.get("job_title") or quick_fields.get("title") or page.title or None,
+        "薪资": header.get("salary") or quick_fields.get("salary"),
+        "职位工作地点": header.get("job_location") or quick_fields.get("location"),
+        "要求年限": quick_fields.get("experience") or (requirement_parts[1] if len(requirement_parts) > 1 else None),
+        "学历要求": quick_fields.get("education") or (requirement_parts[2] if len(requirement_parts) > 2 else None),
+        "职位描述": _extract_section_text(
+            body_text,
+            ("职位描述",),
+            ("竞争力分析", "BOSS 安全提示", "公司介绍", "工商信息", "工作地址", "更多职位", "精选职位", "看过该职位的人还看了"),
+        ),
+        "工商信息": _business_info_chinese(business_info),
+        "工作地址": _extract_job_address(body_text),
+    }
+
+
 def _extract_business_info_from_html(html: str, base_url: str) -> dict[str, Any]:
     if not html:
         return {}
@@ -270,12 +402,21 @@ def clean_job_page(page: JobPageContent) -> dict[str, Any]:
         **_extract_business_info_from_text(body_text),
         **_extract_business_info_from_html(page.html or "", page.final_url or page.url),
     }
+    job_description = _extract_job_description_from_html(page.html or "") or _extract_section_text(
+        body_text,
+        ("职位描述",),
+        ("竞争力分析", "BOSS 安全提示", "公司介绍", "工商信息", "工作地址", "更多职位", "精选职位", "看过该职位的人还看了"),
+    )
+    page_content = _clean_page_content(page, body_text, quick_fields, business_info)
+    if job_description:
+        page_content["职位描述"] = job_description
 
     return {
         "url": page.url,
         "final_url": page.final_url,
         "fetched_at": page.fetched_at,
         "page_title": page.title or None,
+        "page_content": page_content,
         "quick_fields": {k: v for k, v in quick_fields.items() if v},
         "business_info": business_info,
         "body_text": body_text,

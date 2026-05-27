@@ -14,10 +14,11 @@ EXPECTED_KEYS = ("职位名称", "公司名称", "工作地点", "工作类型",
 
 
 def build_basic_info_messages(cleaned: dict[str, Any]) -> list[dict[str, Any]]:
-    context = agent_input_context(cleaned, focus_hint="提取职位基础信息字段")
+    context = agent_input_context(cleaned, focus_hint="提取职位基础信息字段", source_scope="basic_info")
     system_prompt = (
         "你是专业的招聘信息抽取助手。"
-        "请从职位页面文本中抽取结构化的基础信息字段。"
+        "你只处理职位基础信息，不分析职责、薪资、公司风险或行业前景。"
+        "请只使用输入中的 `sections.general`、`sections.address`、`sections.company` 和 `quick_fields`。"
         "只输出JSON对象，不要输出多余文本。所有结论必须来源于输入，不得编造。"
     )
     user_static = (
@@ -53,5 +54,5 @@ def analyze_basic_info(cleaned: dict[str, Any]) -> dict[str, Any]:
         "url": cleaned.get("url"),
         "model": MODEL_NAME,
         "analysis": analysis,
-        "input": agent_input_context(cleaned, focus_hint="提取职位基础信息字段"),
+        "input": agent_input_context(cleaned, focus_hint="提取职位基础信息字段", source_scope="basic_info"),
     }

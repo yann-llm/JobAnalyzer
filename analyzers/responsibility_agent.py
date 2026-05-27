@@ -14,9 +14,11 @@ EXPECTED_KEYS = ("岗位职责", "核心任务", "技术栈", "汇总要点")
 
 
 def build_responsibility_messages(cleaned: dict[str, Any]) -> list[dict[str, Any]]:
-    context = agent_input_context(cleaned, focus_hint="拆解岗位职责与核心任务")
+    context = agent_input_context(cleaned, focus_hint="拆解岗位职责与核心任务", source_scope="responsibilities")
     system_prompt = (
         "你是专业的招聘信息分析助手，擅长把岗位描述拆解为可执行的职责清单。"
+        "你只分析职责与工作内容，不分析薪资、公司背景或法律合规。"
+        "请只使用 `sections.responsibilities`、`sections.overview` 和 `quick_fields`。"
         "只输出JSON对象，不要输出多余文本。所有结论必须来源于输入。"
     )
     user_static = (
@@ -50,5 +52,5 @@ def analyze_responsibilities(cleaned: dict[str, Any]) -> dict[str, Any]:
         "url": cleaned.get("url"),
         "model": MODEL_NAME,
         "analysis": analysis,
-        "input": agent_input_context(cleaned, focus_hint="拆解岗位职责与核心任务"),
+        "input": agent_input_context(cleaned, focus_hint="拆解岗位职责与核心任务", source_scope="responsibilities"),
     }

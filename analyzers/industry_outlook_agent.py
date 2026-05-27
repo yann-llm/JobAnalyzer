@@ -34,11 +34,13 @@ EXPECTED_KEYS = (
 
 
 def build_industry_outlook_messages(cleaned: dict[str, Any]) -> list[dict[str, Any]]:
-    context = agent_input_context(cleaned, focus_hint="评估行业与赛道前景")
+    context = agent_input_context(cleaned, focus_hint="评估行业与赛道前景", source_scope="industry_outlook")
     system_prompt = (
         "你是熟悉中国市场的行业研究助手。"
         "你的判断来自训练时积累的公开知识，不能联网获取实时数据，因此严禁编造具体的`年增长率`、`市场规模`数字、"
         "`政策文号`、`融资金额`这类容易过时的精确数据。可以使用方向性判断如`快速增长`、`稳健增长`、`存量博弈`、`需求收缩`等。"
+        "你只分析赛道和行业，不分析公司财务、劳动合规或具体薪酬福利。"
+        "请只使用 `sections.overview`、`sections.company`、`quick_fields` 和 `business_info`。"
         "只输出JSON对象，不要输出多余文本。每个判断都要在 `信息来源` 字段标注是 `页面原文`/`模型常识`/`未知`。"
     )
     user_static = (
@@ -111,5 +113,5 @@ def analyze_industry_outlook(cleaned: dict[str, Any]) -> dict[str, Any]:
         "url": cleaned.get("url"),
         "model": MODEL_NAME,
         "analysis": analysis,
-        "input": agent_input_context(cleaned, focus_hint="评估行业与赛道前景"),
+        "input": agent_input_context(cleaned, focus_hint="评估行业与赛道前景", source_scope="industry_outlook"),
     }

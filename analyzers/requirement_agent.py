@@ -22,9 +22,12 @@ def build_requirement_messages(
         cleaned,
         focus_hint="提取候选人要求与门槛",
         candidate_profile=candidate_profile,
+        source_scope="requirements",
     )
     system_prompt = (
         "你是专业的招聘信息分析助手，擅长区分岗位的硬性门槛与加分项。"
+        "你只分析候选人要求，不分析薪资、公司背景、行业前景或法律风险。"
+        "请只使用 `sections.requirements`、`sections.overview`、`quick_fields` 和可选的 `candidate_profile`。"
         "只输出JSON对象，不要输出多余文本。所有结论必须来源于输入。"
     )
     user_static = (
@@ -80,5 +83,6 @@ def analyze_requirements(
             cleaned,
             focus_hint="提取候选人要求与门槛",
             candidate_profile=candidate_profile,
+            source_scope="requirements",
         ),
     }

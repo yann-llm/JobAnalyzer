@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
     except (AttributeError, OSError):
         pass
 
-from external_data import enrich as enrich_external_data
+from external_data import clean_qcc_payload, enrich as enrich_external_data
 from scraper import ScraperError, clean_job_page, fetch_job_page, find_business_detail_url_for_page
 from scraper.job_scraper import default_profile_dir
 
@@ -74,6 +75,63 @@ def write_json(path: Path, data: Any) -> None:
 def write_text(path: Path, data: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(data, encoding="utf-8")
+
+
+def cleanup_known_artifacts(base_dir: Path) -> None:
+    """Remove prior generated artifacts that are no longer part of the contract."""
+    base = base_dir.resolve()
+    data_root = DATA_DIR.resolve()
+    if not (base == data_root or data_root in base.parents):
+        raise ValueError(f"Refusing to clean outside data dir: {base}")
+    for name in (
+        "raw_page_meta.json",
+        "raw_page.json",
+        "cleaned_page_content.json",
+        "summary.json",
+        "qcc_raw.json",
+    ):
+        target = base_dir / name
+        if target.exists():
+            target.unlink()
+    for name in ("company_detail", "company_detail_2", "screenshot", "company_qcc"):
+        target = base_dir / name
+        if target.exists() and target.is_dir():
+            shutil.rmtree(target)
+
+
+def business_info_to_chinese(info: dict[str, Any]) -> dict[str, Any]:
+    mapping = {
+        "company_name": "公司名称",
+        "unified_social_credit_code": "统一社会信用代码",
+        "legal_representative": "法定代表人",
+        "established_date": "成立日期",
+        "company_type": "企业类型",
+        "business_status": "经营状态",
+        "registered_capital": "注册资金",
+        "company_detail_url": "公司详情页",
+    }
+    return {label: info[key] for key, label in mapping.items() if info.get(key)}
+
+
+def sync_page_content_business_info(cleaned: dict[str, Any]) -> None:
+    page_content = cleaned.setdefault("page_content", {})
+    business_info = cleaned.get("business_info") or {}
+    page_content["工商信息"] = business_info_to_chinese(business_info)
+
+
+def final_page_content(cleaned: dict[str, Any]) -> dict[str, Any]:
+    page_content = cleaned.get("page_content") or {}
+    fields = (
+        "职位名称",
+        "薪资",
+        "职位工作地点",
+        "要求年限",
+        "学历要求",
+        "职位描述",
+        "工商信息",
+        "工作地址",
+    )
+    return {field: page_content.get(field) for field in fields}
 
 
 def enrich_business_info_from_company_page(
@@ -123,16 +181,6 @@ def enrich_business_info_from_company_page(
         business_info["company_detail_url"] = company_page.final_url or next_url
         business_info["company_detail_fetched_at"] = company_page.fetched_at
 
-        suffix = "" if attempt == 1 else f"_{attempt}"
-        company_dir = base_dir / f"company_detail{suffix}"
-        if company_page.html:
-            write_text(company_dir / "raw_page.html", company_page.html)
-        write_json(
-            company_dir / "raw_page_meta.json",
-            {**company_page.to_dict(), "html": f"(see raw_page.html, {len(company_page.html or '')} chars)"},
-        )
-        write_json(company_dir / "cleaned.json", company_cleaned)
-
         live_detail_url = find_business_detail_url_for_page(company_page, port=port)
         next_url = live_detail_url if live_detail_url and live_detail_url not in seen_urls else None
 
@@ -153,6 +201,7 @@ def analyze_url(
     base_dir = run_dir(url)
     base_dir.mkdir(parents=True, exist_ok=True)
     profile_path = Path(profile_dir) if profile_dir else default_profile_dir()
+    cleanup_known_artifacts(base_dir)
 
     print(f"[抓取] {url}")
     print(f"[抓取] Chrome profile: {profile_path}  port: {port}")
@@ -176,7 +225,6 @@ def analyze_url(
             "status": "scrape_error",
             "message": str(exc),
         }
-        write_json(base_dir / "summary.json", summary)
         return {"summary": summary, "cleaned": None}
 
     print(
@@ -184,6 +232,9 @@ def analyze_url(
         f"title={page.title!r}  body={page.meta.get('extracted_chars')} 字  "
         f"launched_chrome={page.meta.get('launched_chrome')}"
     )
+
+    if page.html:
+        write_text(base_dir / "raw_page.html", page.html)
 
     cleaned = clean_job_page(page)
     cleaned = enrich_business_info_from_company_page(
@@ -194,18 +245,17 @@ def analyze_url(
         prefer_existing_tab=prefer_existing_tab,
         login_wait_timeout=login_wait_timeout,
     )
+    sync_page_content_business_info(cleaned)
     print("[整合] 清洗完成，准备整合外部公司数据...")
     cleaned = enrich_external_data(cleaned)
-    if page.html:
-        write_text(base_dir / "raw_page.html", page.html)
-    write_json(
-        base_dir / "raw_page_meta.json",
-        {**page.to_dict(), "html": f"(see raw_page.html, {len(page.html or '')} chars)"},
-    )
-    write_json(base_dir / "cleaned.json", cleaned)
+    sync_page_content_business_info(cleaned)
     qcc = (cleaned.get("external") or {}).get("qcc")
     if qcc:
-        write_json(base_dir / "qcc_raw.json", qcc)
+        qcc_dir = base_dir / "company_qcc"
+        qcc_raw = {k: v for k, v in qcc.items() if k != "cleaned"}
+        write_json(qcc_dir / "qcc_raw.json", qcc_raw)
+        write_json(qcc_dir / "clean_qcc.json", qcc.get("cleaned") or clean_qcc_payload(qcc))
+    write_json(base_dir / "cleaned.json", final_page_content(cleaned))
 
     body_len = len((cleaned.get("body_text") or "").strip())
     if body_len < 80:
@@ -224,7 +274,6 @@ def analyze_url(
             "body_chars": body_len,
             "message": message,
         }
-        write_json(base_dir / "summary.json", summary)
         return {"summary": summary, "cleaned": cleaned}
 
     qcc = qcc or {}
@@ -244,7 +293,6 @@ def analyze_url(
             "error": qcc.get("error"),
         },
     }
-    write_json(base_dir / "summary.json", summary)
     return {
         "summary": summary,
         "cleaned": cleaned,
@@ -270,7 +318,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Always open a new tab instead of reusing one already on the URL.",
     )
-    parser.add_argument("--no-screenshot", action="store_true", help="Skip the full-page screenshot.")
+    parser.add_argument("--screenshot", action="store_true", help="Save a full-page screenshot.")
     parser.add_argument(
         "--login-wait",
         type=int,
@@ -287,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
         args.url,
         profile_dir=args.profile_dir,
         port=args.port,
-        keep_screenshot=not args.no_screenshot,
+        keep_screenshot=args.screenshot,
         prefer_existing_tab=not args.no_existing_tab,
         login_wait_timeout=args.login_wait,
     )

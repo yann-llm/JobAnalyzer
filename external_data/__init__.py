@@ -15,6 +15,6 @@ If no ``qcc_config.json`` exists or the call fails, ``enrich`` is a no-op
 — the downstream pipeline falls back to model-only analysis.
 """
 
-from .enrich import enrich, has_qcc_config
+from .enrich import clean_qcc_payload, enrich, has_qcc_config
 
-__all__ = ["enrich", "has_qcc_config"]
+__all__ = ["clean_qcc_payload", "enrich", "has_qcc_config"]

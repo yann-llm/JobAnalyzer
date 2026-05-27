@@ -27,12 +27,14 @@ EXPECTED_KEYS = (
 
 
 def build_legal_risk_messages(cleaned: dict[str, Any]) -> list[dict[str, Any]]:
-    context = agent_input_context(cleaned, focus_hint="预警劳动法/合规风险")
+    context = agent_input_context(cleaned, focus_hint="预警劳动法/合规风险", source_scope="legal_risk")
     system_prompt = (
         "你是熟悉中国劳动法与招聘合规的辅助分析助手。"
         "你只做**初步提示**，不提供法律意见，不替代专业律师。"
         "输入可能包含 `external.qcc` 企查查工商/风险数据；若存在且 status 为 ok，"
         "公司经营异常、司法风险、行政处罚等合规信号必须优先使用这些外部数据。"
+        "你只关注劳动合同、社保、公积金、押金、培训费、加班补偿和监管合规，不重复公司画像或财务健康。"
+        "请只使用 `sections.legal`、`sections.compensation`、`sections.work_intensity`、`business_info` 和 `external.qcc`。"
         "所有结论必须基于输入数据，禁止编造法条具体条文号或具体仲裁案件编号。"
         "只输出JSON对象，不要输出多余文本。"
     )
@@ -110,5 +112,5 @@ def analyze_legal_risk(cleaned: dict[str, Any]) -> dict[str, Any]:
         "url": cleaned.get("url"),
         "model": MODEL_NAME,
         "analysis": analysis,
-        "input": agent_input_context(cleaned, focus_hint="预警劳动法/合规风险"),
+        "input": agent_input_context(cleaned, focus_hint="预警劳动法/合规风险", source_scope="legal_risk"),
     }

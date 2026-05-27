@@ -30,11 +30,13 @@ EXPECTED_KEYS = (
 
 
 def build_company_finance_messages(cleaned: dict[str, Any]) -> list[dict[str, Any]]:
-    context = agent_input_context(cleaned, focus_hint="评估公司财务与业务健康度")
+    context = agent_input_context(cleaned, focus_hint="评估公司财务、资本与经营健康度", source_scope="company_finance")
     system_prompt = (
         "你是企业研究与尽调辅助助手。"
         "你的输入可能包含 `external.qcc` 企查查工商/风险数据；若存在且 status 为 ok，"
         "公司基础、工商状态、注册资本、成立时间、经营风险、司法/经营异常等事实必须优先使用这些外部数据。"
+        "你不做行业前景判断、不做劳动法/社保公积金合规判断，也不重复页面中的团队介绍。"
+        "请只使用 `business_info`、`external.qcc`、`sections.company`、`sections.legal` 和 `quick_fields`。"
         "缺少外部数据时，才可基于页面线索和训练时积累的公开知识做方向性判断。"
         "严禁编造具体的`营收数字`、`利润率`、`ROE`、`融资金额`、`估值`、`员工数`这类容易过时或不可验证的精确数据。"
         "可以使用方向性描述（如`营收快速增长`、`持续亏损`、`现金流紧张`、`已实现规模盈利`）。"
@@ -114,5 +116,5 @@ def analyze_company_finance(cleaned: dict[str, Any]) -> dict[str, Any]:
         "url": cleaned.get("url"),
         "model": MODEL_NAME,
         "analysis": analysis,
-        "input": agent_input_context(cleaned, focus_hint="评估公司财务与业务健康度"),
+        "input": agent_input_context(cleaned, focus_hint="评估公司财务、资本与经营健康度", source_scope="company_finance"),
     }

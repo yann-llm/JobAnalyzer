@@ -20,11 +20,14 @@ def build_compensation_messages(
 ) -> list[dict[str, Any]]:
     context = agent_input_context(
         cleaned,
-        focus_hint="分析薪资、福利与工作强度",
+        focus_hint="分析薪资、奖金、福利与薪酬竞争力",
         candidate_profile=candidate_profile,
+        source_scope="compensation",
     )
     system_prompt = (
-        "你是专业的招聘信息分析助手，擅长解读薪资构成、福利结构与工作强度信号。"
+        "你是专业的招聘信息分析助手，擅长解读薪资构成、奖金、福利结构与薪酬竞争力。"
+        "你不评估整体工作强度；工时、加班和压力源只在它们影响薪酬补偿时作为事实摘录。"
+        "请只使用 `sections.compensation`、`sections.work_intensity`、`sections.overview`、`quick_fields` 和可选的 `candidate_profile`。"
         "只输出JSON对象，不要输出多余文本。所有结论必须来源于输入。"
     )
     user_static = (
@@ -50,7 +53,7 @@ def build_compensation_messages(
         "`隐性福利`(字符串数组，如`通勤班车`、`住房补贴`、`餐补`、`宿舍`、`晋升通道明晰`、`内部培训体系`、`扁平管理`)。"
         "每个数组最多10条；无明显信号填空数组。原文未明示`五险一金`等基础项时也不要默认补上。"
 
-        "`工作时间`为对象，包含`工作制`(如`大小周`、`双休`、`996`、`弹性工作制`)、`每周工时`、`是否加班`、`加班补偿`(如`调休`、`加班费`、`未明确`)四个键，缺失填null。"
+        "`工作时间`只记录与薪酬直接相关的工时事实，包含`工作制`、`每周工时`、`是否加班`、`加班补偿`四个键；不要据此输出强度评级，缺失填null。"
 
         "`薪酬竞争力`为对象，包含以下键："
         "`评估等级`(`偏低`/`一般`/`有竞争力`/`高于市场`/`数据不足`其一)、"
@@ -98,7 +101,8 @@ def analyze_compensation(
         "analysis": analysis,
         "input": agent_input_context(
             cleaned,
-            focus_hint="分析薪资、福利与工作强度",
+            focus_hint="分析薪资、奖金、福利与薪酬竞争力",
             candidate_profile=candidate_profile,
+            source_scope="compensation",
         ),
     }
