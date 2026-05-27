@@ -1,8 +1,7 @@
 """Shared LLM SDK helpers with OpenAI, Anthropic, and DeepSeek provider support.
 
-Adapted from the eastmoney project. Reads provider/model/api_key/base_url from
-``llm_config.json`` next to this file (override path via ``LLM_CONFIG_PATH``),
-falling back to environment variables. Provides:
+Reads provider/model/api_key/base_url from environment variables. A model must
+be explicitly configured with ``MODEL_NAME`` or ``LLM_MODEL``. Provides:
 
 - ``chat_completion`` / ``chat_text``: free-form chat calls
 - ``chat_json``: chat calls that must return a JSON object (with validation)
@@ -17,62 +16,44 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
-from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-PROJECT_DIR = Path(__file__).resolve().parent
-CONFIG_PATH_ENV = "LLM_CONFIG_PATH"
-DEFAULT_CONFIG_PATH = PROJECT_DIR / "llm_config.json"
+# Load .env file at import time so all downstream modules see the env vars.
+# override=True so .env takes precedence over stale shell env vars.
+try:
+    from dotenv import load_dotenv
 
-DEFAULT_PROVIDER = "openai"
-DEFAULT_OPENAI_MODEL = "gpt-5.5"
-DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5"
-DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash"
-DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-API_KEY_ENV = "MY_API_KEY"
-BASE_URL_ENV = "MY_BASE_URL"
-ANTHROPIC_API_KEY_ENV = "ANTHROPIC_API_KEY"
-ANTHROPIC_BASE_URL_ENV = "ANTHROPIC_BASE_URL"
-DEEPSEEK_API_KEY_ENV = "DEEPSEEK_API_KEY"
-DEEPSEEK_BASE_URL_ENV = "DEEPSEEK_BASE_URL"
-TIMEOUT_ENV = "MY_LLM_TIMEOUT_SECONDS"
-MAX_RETRIES_ENV = "MY_LLM_MAX_RETRIES"
+    load_dotenv(override=True)
+except ImportError:
+    pass
+
 DEFAULT_TIMEOUT_SECONDS = 300
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_MAX_TOKENS = 8192
-TEMPERATURE_REJECT_MODELS_ENV = "MY_LLM_TEMPERATURE_REJECT_MODELS"
 DEFAULT_TEMPERATURE_REJECT_MODELS: tuple[str, ...] = ("opus-4-7",)
 
-_PROVIDER_DEFAULTS: dict[str, dict[str, Any]] = {
+_PROVIDER_ENV: dict[str, dict[str, Any]] = {
     "openai": {
-        "model": DEFAULT_OPENAI_MODEL,
-        "api_key_env": API_KEY_ENV,
-        "base_url_env": BASE_URL_ENV,
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url_env": "OPENAI_BASE_URL",
         "default_base_url": None,
     },
     "anthropic": {
-        "model": DEFAULT_ANTHROPIC_MODEL,
-        "api_key_env": ANTHROPIC_API_KEY_ENV,
-        "base_url_env": ANTHROPIC_BASE_URL_ENV,
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "base_url_env": "ANTHROPIC_BASE_URL",
         "default_base_url": None,
-    },
-    "deepseek": {
-        "model": DEFAULT_DEEPSEEK_MODEL,
-        "api_key_env": DEEPSEEK_API_KEY_ENV,
-        "base_url_env": DEEPSEEK_BASE_URL_ENV,
-        "default_base_url": DEFAULT_DEEPSEEK_BASE_URL,
     },
 }
 
-_OPENAI_COMPATIBLE_PROVIDERS = frozenset({"openai", "deepseek"})
+_OPENAI_COMPATIBLE_PROVIDERS = frozenset({"openai"})
 
 Message = dict[str, str]
 
 
 @lru_cache(maxsize=1)
 def _temperature_reject_patterns() -> tuple[str, ...]:
-    raw = os.getenv(TEMPERATURE_REJECT_MODELS_ENV)
+    raw = os.getenv("MY_LLM_TEMPERATURE_REJECT_MODELS")
     if raw is None:
         return DEFAULT_TEMPERATURE_REJECT_MODELS
     return tuple(p.strip().lower() for p in raw.split(",") if p.strip())
@@ -83,31 +64,20 @@ def _model_rejects_temperature(model: str) -> bool:
     return any(p in name for p in _temperature_reject_patterns())
 
 
-def _provider_config(payload: dict[str, Any], provider: str) -> dict[str, Any]:
-    providers = payload.get("providers")
-    if isinstance(providers, dict) and isinstance(providers.get(provider), dict):
-        return providers[provider]
-    nested = payload.get(provider)
-    return nested if isinstance(nested, dict) else {}
+def _infer_provider(model_name: str) -> str:
+    """Infer provider from model name.
 
-
-def _provider_defaults(provider: str) -> dict[str, Any]:
-    return _PROVIDER_DEFAULTS.get(provider, _PROVIDER_DEFAULTS[DEFAULT_PROVIDER])
+    Only two protocol types:
+      - anthropic: models containing 'claude'
+      - openai: everything else (OpenAI, DeepSeek, etc. — all OpenAI-compatible)
+    """
+    if "claude" in model_name.lower():
+        return "anthropic"
+    return "openai"
 
 
 def _configured_default_model() -> str:
-    config_path = Path(os.getenv(CONFIG_PATH_ENV, str(DEFAULT_CONFIG_PATH)))
-    payload: dict[str, Any] = {}
-    if config_path.exists():
-        try:
-            loaded = json.loads(config_path.read_text(encoding="utf-8"))
-            payload = loaded if isinstance(loaded, dict) else {}
-        except json.JSONDecodeError:
-            payload = {}
-    provider = str(payload.get("provider") or os.getenv("LLM_PROVIDER") or DEFAULT_PROVIDER).strip().lower()
-    provider_payload = _provider_config(payload, provider)
-    default_model = _provider_defaults(provider)["model"]
-    return str(provider_payload.get("model") or payload.get("model") or os.getenv("LLM_MODEL") or default_model)
+    return os.getenv("MODEL_NAME") or os.getenv("LLM_MODEL") or ""
 
 
 DEFAULT_MODEL = _configured_default_model()
@@ -123,48 +93,23 @@ class LlmConfig:
     max_retries: int
 
 
-def _read_config_file() -> dict[str, Any]:
-    config_path = Path(os.getenv(CONFIG_PATH_ENV, str(DEFAULT_CONFIG_PATH)))
-    if not config_path.exists():
-        return {}
-    try:
-        payload = json.loads(config_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Invalid LLM config JSON: {config_path}") from exc
-    if not isinstance(payload, dict):
-        raise RuntimeError(f"LLM config must be a JSON object: {config_path}")
-    return payload
-
-
-def _config_value(provider_payload: dict[str, Any], root_payload: dict[str, Any], key: str, env_name: str | None = None) -> Any:
-    if provider_payload.get(key) not in (None, ""):
-        return provider_payload.get(key)
-    if root_payload.get(key) not in (None, ""):
-        return root_payload.get(key)
-    return os.getenv(env_name) if env_name else None
-
-
-def _required(value: str | None, label: str) -> str:
-    if not value:
-        raise RuntimeError(f"Missing required LLM configuration: {label}")
-    return value
-
-
 @lru_cache(maxsize=1)
 def get_llm_config() -> LlmConfig:
-    payload = _read_config_file()
-    provider = str(payload.get("provider") or os.getenv("LLM_PROVIDER") or DEFAULT_PROVIDER).strip().lower()
-    if provider not in _PROVIDER_DEFAULTS:
-        supported = ", ".join(sorted(_PROVIDER_DEFAULTS))
+    model = os.getenv("MODEL_NAME") or os.getenv("LLM_MODEL")
+    if model:
+        provider = (os.getenv("LLM_PROVIDER") or _infer_provider(model)).strip().lower()
+    else:
+        raise RuntimeError("Missing required LLM model: set MODEL_NAME or LLM_MODEL")
+
+    if provider not in _PROVIDER_ENV:
+        supported = ", ".join(sorted(_PROVIDER_ENV))
         raise RuntimeError(f"Unsupported LLM provider: {provider} (supported: {supported})")
 
-    provider_payload = _provider_config(payload, provider)
-    defaults = _provider_defaults(provider)
-    model = str(_config_value(provider_payload, payload, "model") or os.getenv("LLM_MODEL") or defaults["model"])
-    timeout = float(_config_value(provider_payload, payload, "timeout", TIMEOUT_ENV) or DEFAULT_TIMEOUT_SECONDS)
-    max_retries = int(_config_value(provider_payload, payload, "max_retries", MAX_RETRIES_ENV) or DEFAULT_MAX_RETRIES)
-    api_key = _config_value(provider_payload, payload, "api_key", defaults["api_key_env"])
-    base_url = _config_value(provider_payload, payload, "base_url", defaults["base_url_env"]) or defaults["default_base_url"]
+    provider_env = _PROVIDER_ENV[provider]
+    api_key = os.getenv(provider_env["api_key_env"])
+    base_url = os.getenv(provider_env["base_url_env"]) or provider_env["default_base_url"]
+    timeout = float(os.getenv("MY_LLM_TIMEOUT_SECONDS") or DEFAULT_TIMEOUT_SECONDS)
+    max_retries = int(os.getenv("MY_LLM_MAX_RETRIES") or DEFAULT_MAX_RETRIES)
 
     return LlmConfig(
         provider=provider,
@@ -185,9 +130,10 @@ def get_openai_client() -> Any:
     from openai import OpenAI
 
     config = get_llm_config()
-    api_key_label = f"{config.provider}.api_key or {_provider_defaults(config.provider)['api_key_env']}"
+    if not config.api_key:
+        raise RuntimeError(f"Missing {_PROVIDER_ENV[config.provider]['api_key_env']} environment variable")
     kwargs: dict[str, Any] = {
-        "api_key": _required(config.api_key, api_key_label),
+        "api_key": config.api_key,
         "base_url": config.base_url,
         "timeout": config.timeout,
         "max_retries": config.max_retries,
@@ -202,8 +148,10 @@ def get_anthropic_client() -> Any:
     from anthropic import Anthropic
 
     config = get_llm_config()
+    if not config.api_key:
+        raise RuntimeError(f"Missing {_PROVIDER_ENV[config.provider]['api_key_env']} environment variable")
     kwargs: dict[str, Any] = {
-        "api_key": _required(config.api_key, "anthropic.api_key or ANTHROPIC_API_KEY"),
+        "api_key": config.api_key,
         "timeout": config.timeout,
         "max_retries": config.max_retries,
     }

@@ -1,4 +1,4 @@
-"""Thin wrappers over MCP calls to qcc-company / qcc-risk.
+"""Thin wrappers over MCP calls to qcc-company / qcc-risk / qcc-operation.
 
 The free functions here return Python dicts that downstream code can drop
 straight into ``cleaned["external"]["qcc"]``. All functions tolerate
@@ -9,19 +9,18 @@ let the pipeline run.
 
 from __future__ import annotations
 
-import json
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 from typing import Any
 
 from .mcp_client import HttpMcpServer, McpError, call_tool, initialize
 
-QCC_CONFIG_ENV = "QCC_CONFIG_PATH"
-DEFAULT_QCC_CONFIG = Path(__file__).resolve().parent.parent / "qcc_config.json"
+QCC_COMPANY_URL = "https://agent.qcc.com/mcp/company/stream"
+QCC_RISK_URL = "https://agent.qcc.com/mcp/risk/stream"
+QCC_OPERATION_URL = "https://agent.qcc.com/mcp/operation/stream"
+QCC_AUTH_BEARER_ENV = "QCC_AUTH_BEARER"
+QCC_TIMEOUT_SECONDS = 60
 
-# Toolsets we call. company tools fetch静态工商画像; risk tools probe the four
-# binary flags (经营异常 / 行政处罚 / 失信 / 被执行) the legal_risk agent needs.
 COMPANY_TOOLS = (
     "get_company_registration_info",
     "get_shareholder_info",
@@ -34,27 +33,28 @@ RISK_TOOLS = (
     "get_judgment_debtor_info",
     "get_dishonest_info",
 )
+OPERATION_TOOLS = (
+    "get_recruitment_info",
+    "get_honor_info",
+)
 
 
-def load_qcc_config(path: str | Path | None = None) -> dict[str, Any] | None:
-    """Read ``qcc_config.json`` next to the project root (or ``$QCC_CONFIG_PATH``).
+def load_qcc_config() -> dict[str, Any] | None:
+    """Build QCC MCP config from environment variables.
 
-    Returns None when no usable config is present so the caller can degrade
-    gracefully.
+    Returns None when QCC_AUTH_BEARER is not set.
     """
-    target = Path(path) if path else Path(os.environ.get(QCC_CONFIG_ENV) or DEFAULT_QCC_CONFIG)
-    if not target.exists():
+    bearer = os.getenv(QCC_AUTH_BEARER_ENV)
+    if not bearer:
         return None
-    try:
-        data = json.loads(target.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(data, dict):
-        return None
-    servers = data.get("servers")
-    if not isinstance(servers, dict) or not servers:
-        return None
-    return data
+    return {
+        "timeout_seconds": QCC_TIMEOUT_SECONDS,
+        "servers": {
+            "qcc-company": {"url": QCC_COMPANY_URL, "auth_bearer": bearer},
+            "qcc-risk": {"url": QCC_RISK_URL, "auth_bearer": bearer},
+            "qcc-operation": {"url": QCC_OPERATION_URL, "auth_bearer": bearer},
+        },
+    }
 
 
 def make_server(name: str, config: dict[str, Any]) -> HttpMcpServer | None:
@@ -150,8 +150,9 @@ def fetch_company_pack(
     search_key: str,
     *,
     include_risk: bool = True,
+    operation_server: HttpMcpServer | None = None,
 ) -> dict[str, Any]:
-    """Fetch the standard pack of company + risk facts in parallel.
+    """Fetch the standard pack of company + risk + operation facts in parallel.
 
     ``search_key`` should be a 18-digit USCC or a complete registration name
     that ends with a whitelisted suffix. Caller is responsible for ensuring
@@ -159,17 +160,20 @@ def fetch_company_pack(
     """
     company_results: dict[str, Any] = {}
     risk_results: dict[str, Any] = {}
+    operation_results: dict[str, Any] = {}
 
     jobs: list[tuple[str, str, HttpMcpServer]] = []
     if company_server:
         jobs.extend(("company", tool, company_server) for tool in COMPANY_TOOLS)
     if risk_server and include_risk:
         jobs.extend(("risk", tool, risk_server) for tool in RISK_TOOLS)
+    if operation_server:
+        jobs.extend(("operation", tool, operation_server) for tool in OPERATION_TOOLS)
 
     if not jobs:
-        return {"company": company_results, "risk": risk_results}
+        return {"company": company_results, "risk": risk_results, "operation": operation_results}
 
-    with ThreadPoolExecutor(max_workers=min(8, len(jobs))) as pool:
+    with ThreadPoolExecutor(max_workers=min(12, len(jobs))) as pool:
         future_to_meta = {
             pool.submit(_safe_call, srv, tool, {"searchKey": search_key}): (bucket, tool)
             for (bucket, tool, srv) in jobs
@@ -180,9 +184,14 @@ def fetch_company_pack(
                 envelope = future.result()
             except Exception as exc:  # noqa: BLE001
                 envelope = {"status": "error", "tool": tool, "message": f"{type(exc).__name__}: {exc}"}
-            (company_results if bucket == "company" else risk_results)[tool] = envelope
+            if bucket == "company":
+                company_results[tool] = envelope
+            elif bucket == "risk":
+                risk_results[tool] = envelope
+            else:
+                operation_results[tool] = envelope
 
-    return {"company": company_results, "risk": risk_results}
+    return {"company": company_results, "risk": risk_results, "operation": operation_results}
 
 
 def ensure_initialized(server: HttpMcpServer) -> dict[str, Any]:

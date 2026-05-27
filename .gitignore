@@ -4,8 +4,7 @@ __pycache__/
 .pytest_cache/
 data/
 .chrome-debug-profile/
-llm_config.json
-qcc_config.json
+.env
 candidate_profile.json
 .idea/
 .vscode/

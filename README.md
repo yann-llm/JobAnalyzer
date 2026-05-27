@@ -33,15 +33,10 @@ job-analysis/
 │   └── qcc_client.py               ← qcc-company / qcc-risk MCP 调用封装
 ├── analyzers/                      ← LLM 分析模块（当前主流程暂时屏蔽）
 │   ├── _shared.py                  ← 公共上下文构造（含候选人画像注入）
-│   ├── basic_info_agent.py         ← 子 agent 1：基础信息
-│   ├── responsibility_agent.py     ← 子 agent 2：岗位职责
-│   ├── requirement_agent.py        ← 子 agent 3：候选人要求（消费候选人画像）
-│   ├── compensation_agent.py       ← 子 agent 4：薪酬与福利（消费候选人画像）
-│   ├── company_agent.py            ← 子 agent 5：公司与团队
-│   ├── work_intensity_agent.py     ← 子 agent 6：工作强度（消费候选人画像）
-│   ├── legal_risk_agent.py         ← 子 agent 7：法律合规风险
-│   ├── industry_outlook_agent.py   ← 子 agent 8：行业与赛道前景（基于模型常识，带 provenance）
-│   ├── company_finance_agent.py    ← 子 agent 9：公司财务健康度（基于模型常识，带 provenance）
+│   ├── job_value_agent.py          ← 子 agent 1：职位综合价值（职责/要求/薪酬/强度多维评分）
+│   ├── company_risk_agent.py       ← 子 agent 2：公司主体健康度与风险（基于企查查）
+│   ├── industry_outlook_agent.py   ← 子 agent 3：行业与赛道前景（基于模型常识，带 provenance）
+│   ├── industry_fetcher.py         ← 行业外部数据辅助获取（暂未纳入主流程）
 │   └── final_evaluation_agent.py   ← 汇总 agent
 ├── .chrome-debug-profile/          ← 自动创建，持久化登录态（已 gitignore）
 └── data/                           ← 每次运行产物（已 gitignore）

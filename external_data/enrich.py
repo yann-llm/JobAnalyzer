@@ -7,6 +7,10 @@ that key and switch their prompts to prefer real data over model recall.
 Failures are non-fatal — if anything goes wrong, the cleaned dict is
 returned with an ``error`` field under ``external.qcc`` and the pipeline
 proceeds with model-only analysis.
+
+Caching: when a job posting carries a USCC (统一社会信用代码) that we've
+already fetched within the TTL window, the QCC MCP calls are skipped and
+the cached qcc_block is reused. See ``company_cache.py``.
 """
 
 from __future__ import annotations
@@ -14,6 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .company_cache import load_cached, save_cached
 from .company_resolver import resolve_from_cleaned
 from .qcc_client import (
     ensure_initialized,
@@ -22,12 +27,15 @@ from .qcc_client import (
     make_server,
 )
 
+DEFAULT_DATA_ROOT = Path(__file__).resolve().parent.parent / "data"
+
 
 def clean_qcc_payload(qcc: dict[str, Any] | None) -> dict[str, Any]:
-    """Reduce the raw qcc block to the five cleaned sections the user wants."""
+    """Reduce the raw qcc block to cleaned sections for downstream agents."""
     qcc = qcc or {}
     company = qcc.get("company") or {}
     risk = qcc.get("risk") or {}
+    operation = qcc.get("operation") or {}
 
     def _data(block: dict[str, Any], tool: str) -> Any:
         item = block.get(tool) or {}
@@ -46,27 +54,52 @@ def clean_qcc_payload(qcc: dict[str, Any] | None) -> dict[str, Any]:
             "judgment_debtor_info": _data(risk, "get_judgment_debtor_info") or {},
             "dishonest_info": _data(risk, "get_dishonest_info") or {},
         },
+        "operation": {
+            "recruitment": _data(operation, "get_recruitment_info") or {},
+            "honor": _data(operation, "get_honor_info") or {},
+        },
     }
     return {k: v for k, v in cleaned.items() if v}
 
 
-def has_qcc_config(path: str | Path | None = None) -> bool:
+def has_qcc_config() -> bool:
     """Cheap probe used by main.py to decide whether to print the enrichment banner."""
-    return load_qcc_config(path) is not None
+    return load_qcc_config() is not None
 
 
-def enrich(cleaned: dict[str, Any], *, config_path: str | Path | None = None) -> dict[str, Any]:
+def enrich(cleaned: dict[str, Any], *, data_root: Path | None = None) -> dict[str, Any]:
     """Attach qcc external data to ``cleaned`` if a config is present.
 
     The original ``cleaned`` dict is returned (mutated in place for callers
     that hold a reference).
+
+    ``data_root`` is the base directory under which the company cache lives
+    (``<data_root>/_company_cache/<USCC>.json``). Defaults to the project
+    ``data/`` folder.
     """
-    config = load_qcc_config(config_path)
+    cache_root = data_root or DEFAULT_DATA_ROOT
+    site_business_info = cleaned.get("business_info") or {}
+    site_uscc = (site_business_info.get("unified_social_credit_code") or "").strip()
+    site_company_name = (site_business_info.get("company_name") or "").strip()
+
+    # Cache fast-path: if the job site already exposes a USCC and we have
+    # a fresh cached pack, reuse it without touching the QCC config / MCP.
+    if site_uscc:
+        cached = load_cached(cache_root, site_uscc)
+        if cached is not None:
+            print(f"[external] 命中公司缓存 USCC={site_uscc}，跳过 qcc MCP 调用")
+            cached_block = dict(cached)
+            cached_block["cache_hit"] = True
+            cleaned.setdefault("external", {})["qcc"] = cached_block
+            return cleaned
+
+    config = load_qcc_config()
     if config is None:
         return cleaned
 
     company_server = make_server("qcc-company", config)
     risk_server = make_server("qcc-risk", config)
+    operation_server = make_server("qcc-operation", config)
     if company_server is None and risk_server is None:
         return cleaned
 
@@ -76,9 +109,6 @@ def enrich(cleaned: dict[str, Any], *, config_path: str | Path | None = None) ->
 
     print("[external] 调用 qcc MCP 抓取真实工商 / 风险数据...")
 
-    site_business_info = cleaned.get("business_info") or {}
-    site_uscc = (site_business_info.get("unified_social_credit_code") or "").strip()
-    site_company_name = (site_business_info.get("company_name") or "").strip()
     if site_uscc:
         anchor = {
             "企业名称": site_company_name,
@@ -114,6 +144,17 @@ def enrich(cleaned: dict[str, Any], *, config_path: str | Path | None = None) ->
             return cleaned
         anchor = resolution["anchor"]
 
+        # Slow path resolved a USCC → try cache once more before MCP.
+        resolved_uscc = (anchor.get("统一社会信用代码") or "").strip()
+        if resolved_uscc:
+            cached = load_cached(cache_root, resolved_uscc)
+            if cached is not None:
+                print(f"[external] 命中公司缓存 USCC={resolved_uscc}（来自模糊搜索锚定），跳过 qcc MCP 调用")
+                cached_block = dict(cached)
+                cached_block["cache_hit"] = True
+                external["qcc"] = cached_block
+                return cleaned
+
     search_key = (anchor.get("统一社会信用代码") or anchor.get("企业名称") or "").strip()
     if not search_key:
         qcc_block["status"] = "no_search_key"
@@ -125,18 +166,44 @@ def enrich(cleaned: dict[str, Any], *, config_path: str | Path | None = None) ->
         f"USCC={anchor.get('统一社会信用代码')}"
     )
 
-    pack = fetch_company_pack(company_server, risk_server, search_key, include_risk=True)
+    pack = fetch_company_pack(
+        company_server, risk_server, search_key,
+        include_risk=True, operation_server=operation_server,
+    )
     qcc_block["status"] = "ok"
     qcc_block["anchor"] = anchor
     qcc_block["search_key"] = search_key
     qcc_block["company"] = pack["company"]
     qcc_block["risk"] = pack["risk"]
+    qcc_block["operation"] = pack["operation"]
     qcc_block["cleaned"] = clean_qcc_payload(qcc_block)
+    qcc_block["cache_hit"] = False
 
     ok_company = sum(1 for r in pack["company"].values() if r.get("status") == "ok")
     ok_risk = sum(1 for r in pack["risk"].values() if r.get("status") == "ok")
+    ok_operation = sum(1 for r in pack["operation"].values() if r.get("status") == "ok")
     print(
         f"  [完成] qcc 工商 {ok_company}/{len(pack['company'])} ok，"
-        f"风险 {ok_risk}/{len(pack['risk'])} ok"
+        f"风险 {ok_risk}/{len(pack['risk'])} ok，"
+        f"经营 {ok_operation}/{len(pack['operation'])} ok"
     )
+
+    # Fetch industry data via Tavily (non-fatal).
+    company_name = (anchor.get("企业名称") or "").strip()
+    if company_name:
+        from analyzers.industry_fetcher import fetch_industry_data
+
+        print(f"  [行业] 通过 Tavily 获取行业数据: {company_name}")
+        industry_data = fetch_industry_data(company_name)
+        qcc_block["industry_data"] = industry_data
+        if industry_data.get("error"):
+            print(f"  [行业] 获取失败（不影响主流程）: {industry_data['error'][:80]}")
+        else:
+            print(f"  [行业] 识别到 {len(industry_data.get('industries', []))} 个行业")
+
+    # Persist to cache for future runs.
+    cache_uscc = (anchor.get("统一社会信用代码") or "").strip()
+    if cache_uscc:
+        save_cached(cache_root, cache_uscc, qcc_block)
+
     return cleaned
