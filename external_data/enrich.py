@@ -191,7 +191,7 @@ def enrich(cleaned: dict[str, Any], *, data_root: Path | None = None) -> dict[st
     # Fetch industry data via Tavily (non-fatal).
     company_name = (anchor.get("企业名称") or "").strip()
     if company_name:
-        from analyzers.industry_fetcher import fetch_industry_data
+        from .industry_fetcher import fetch_industry_data
 
         print(f"  [行业] 通过 Tavily 获取行业数据: {company_name}")
         industry_data = fetch_industry_data(company_name)

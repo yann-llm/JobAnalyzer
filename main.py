@@ -87,6 +87,7 @@ def cleanup_known_artifacts(base_dir: Path) -> None:
         "raw_page_meta.json",
         "raw_page.json",
         "cleaned_page_content.json",
+        "cleaned.json",
         "summary.json",
         "qcc_raw.json",
     ):
@@ -250,12 +251,28 @@ def analyze_url(
     cleaned = enrich_external_data(cleaned)
     sync_page_content_business_info(cleaned)
     qcc = (cleaned.get("external") or {}).get("qcc")
-    if qcc:
-        qcc_dir = base_dir / "company_qcc"
-        qcc_raw = {k: v for k, v in qcc.items() if k != "cleaned"}
-        write_json(qcc_dir / "qcc_raw.json", qcc_raw)
-        write_json(qcc_dir / "clean_qcc.json", qcc.get("cleaned") or clean_qcc_payload(qcc))
-    write_json(base_dir / "cleaned.json", final_page_content(cleaned))
+
+    # Write job_cleaned.json (pure job posting fields).
+    write_json(base_dir / "job_cleaned.json", final_page_content(cleaned))
+
+    # Write company.json (reference pointer to company cache).
+    if qcc and qcc.get("status") == "ok":
+        anchor = qcc.get("anchor") or {}
+        uscc = (anchor.get("统一社会信用代码") or "").strip()
+        company_ref: dict[str, Any] = {
+            "uscc": uscc,
+            "company_name": anchor.get("企业名称", ""),
+            "cache_path": f"_company_cache/{uscc}.json" if uscc else None,
+            "status": "ok",
+            "cache_hit": qcc.get("cache_hit", False),
+        }
+        write_json(base_dir / "company.json", company_ref)
+    elif qcc:
+        write_json(base_dir / "company.json", {
+            "status": qcc.get("status", "unknown"),
+            "error": qcc.get("error"),
+            "note": "公司数据未成功获取，无缓存可引用",
+        })
 
     body_len = len((cleaned.get("body_text") or "").strip())
     if body_len < 80:

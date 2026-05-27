@@ -11,7 +11,7 @@ from typing import Any
 from llm import DEFAULT_MODEL, chat_json
 
 from ._shared import agent_input_context, build_messages
-from .industry_fetcher import fetch_industry_data
+from external_data.industry_fetcher import fetch_industry_data
 
 MODULE_NAME = "industry_outlook"
 MODEL_NAME = DEFAULT_MODEL
