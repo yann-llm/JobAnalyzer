@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/
+.chrome-debug-profile/
+llm_config.json
+qcc_config.json
+candidate_profile.json
+.idea/
+.vscode/
+*.log
