@@ -5,8 +5,14 @@
  * 等后端 schema 落地后，统一在 ApiService 里写映射层把后端响应转成这套类型。
  */
 
-/** 六维评分键 —— 与雷达图、维度卡片、子 tab 一一对应 */
-export type DimensionId = 'd0' | 'd1' | 'd2' | 'd3' | 'd4' | 'd5';
+/** 六维评分键 —— 语义化命名，与雷达图、维度卡片、子 tab 一一对应 */
+export type DimensionId =
+  | 'responsibility'    // 职责质量
+  | 'requirements'      // 要求合理性
+  | 'compensation'      // 薪酬福利
+  | 'workload'          // 工作强度
+  | 'companyHealth'     // 公司评分（来自 company_risk_agent）
+  | 'industryOutlook';  // 行业评分（来自 industry_outlook_agent）
 
 export interface DimensionMeta {
   id: DimensionId;
@@ -17,12 +23,12 @@ export interface DimensionMeta {
 }
 
 export const DIMENSIONS: readonly DimensionMeta[] = [
-  { id: 'd0', name: '职责质量',   short: '职责' },
-  { id: 'd1', name: '要求合理性', short: '要求' },
-  { id: 'd2', name: '薪酬福利',   short: '薪酬' },
-  { id: 'd3', name: '工作强度',   short: '强度' },
-  { id: 'd4', name: '公司评分',   short: '公司' },
-  { id: 'd5', name: '行业评分',   short: '行业' },
+  { id: 'responsibility',   name: '职责质量',   short: '职责' },
+  { id: 'requirements',     name: '要求合理性', short: '要求' },
+  { id: 'compensation',     name: '薪酬福利',   short: '薪酬' },
+  { id: 'workload',         name: '工作强度',   short: '强度' },
+  { id: 'companyHealth',    name: '公司评分',   short: '公司' },
+  { id: 'industryOutlook',  name: '行业评分',   short: '行业' },
 ];
 
 /** 综合解读区的「优劣势对比」 */
@@ -92,8 +98,31 @@ export interface JobAnalysis {
   details: Record<DimensionId, DimensionDetail>;
 }
 
+/** 公司多维评分键 —— modal 里展示，与职位 6 维独立 */
+export type CompanyScoreId =
+  | 'financialStability'   // 财务稳健性
+  | 'growth'               // 成长性
+  | 'employeeReputation'   // 员工口碑
+  | 'promotion'            // 晋升机会
+  | 'management'           // 管理水平
+  | 'techCulture';         // 技术氛围
+
+export interface CompanyScoreMeta {
+  id: CompanyScoreId;
+  name: string;
+}
+
+export const COMPANY_SCORE_DIMENSIONS: readonly CompanyScoreMeta[] = [
+  { id: 'financialStability', name: '财务稳健性' },
+  { id: 'growth',             name: '成长性' },
+  { id: 'employeeReputation', name: '员工口碑' },
+  { id: 'promotion',          name: '晋升机会' },
+  { id: 'management',         name: '管理水平' },
+  { id: 'techCulture',        name: '技术氛围' },
+];
+
 /** 公司多维评分（modal 里展示） */
-export type CompanyScores = Record<string, number>;
+export type CompanyScores = Record<CompanyScoreId, number>;
 
 export interface CompanyMeta {
   size: string;

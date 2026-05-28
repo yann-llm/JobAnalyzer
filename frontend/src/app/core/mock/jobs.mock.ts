@@ -19,12 +19,12 @@ export const MOCK_COMPANIES: Record<string, Company> = {
       ['在招职位', '1284 个'],
     ],
     scores: {
-      财务稳健性: 88,
-      成长性: 92,
-      员工口碑: 76,
-      晋升机会: 81,
-      管理水平: 79,
-      技术氛围: 89,
+      financialStability: 88,
+      growth: 92,
+      employeeReputation: 76,
+      promotion: 81,
+      management: 79,
+      techCulture: 89,
     },
     desc: '字节跳动是一家以技术为驱动的全球内容平台公司,运营产品包括抖音、TikTok、今日头条、西瓜视频、飞书等。AI 与推荐算法是核心壁垒,业务条线广,内部赛马机制活跃,适合追求高速成长与挑战性的工程师,但工作强度普遍偏高。',
     industry: {
@@ -52,12 +52,12 @@ export const MOCK_COMPANIES: Record<string, Company> = {
       ['在招职位', '23 个'],
     ],
     scores: {
-      财务稳健性: 94,
-      成长性: 82,
-      员工口碑: 91,
-      晋升机会: 72,
-      管理水平: 88,
-      技术氛围: 93,
+      financialStability: 94,
+      growth: 82,
+      employeeReputation: 91,
+      promotion: 72,
+      management: 88,
+      techCulture: 93,
     },
     desc: 'Stripe 是全球领先的支付基础设施公司,中国分部以工程文化、严谨的代码评审与极致用户体验著称。Work-life balance 在外企平均水平之上,但晋升通道较慢,需要长期投入。',
     industry: {
@@ -85,12 +85,12 @@ export const MOCK_COMPANIES: Record<string, Company> = {
       ['在招职位', '942 个'],
     ],
     scores: {
-      财务稳健性: 81,
-      成长性: 68,
-      员工口碑: 64,
-      晋升机会: 75,
-      管理水平: 72,
-      技术氛围: 78,
+      financialStability: 81,
+      growth: 68,
+      employeeReputation: 64,
+      promotion: 75,
+      management: 72,
+      techCulture: 78,
     },
     desc: '美团是中国领先的本地生活服务平台,业务覆盖外卖、到店、酒旅、闪购、社区团购等。数据驱动文化深厚,但部分线下业务工作节奏较快,加班文化在行业内偏严重。',
     industry: {
@@ -130,7 +130,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
       headcount: '2 人',
       posted: '今天 09:21',
     },
-    scores: { d0: 82, d1: 76, d2: 88, d3: 58, d4: 84, d5: 84 },
+    scores: { responsibility: 82, requirements: 76, compensation: 88, workload: 58, companyHealth: 84, industryOutlook: 84 },
     total: 79,
     grade: 'A · 推荐投递',
     miniLabel: '字节跳动 · 前端',
@@ -152,7 +152,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
       '前端方向团队近一年波动较大',
     ],
     details: {
-      d0: {
+      responsibility: {
         title: '职责清晰具体,技术挑战明确',
         text: '职责描述包含 5 项具体内容,平均长度 38 字,远超行业 22 字均值。提及 "负责飞书文档编辑器核心模块"、"推进富文本协同算法优化" 等明确技术方向,JD 撰写质量在 P90 以上。',
         kpis: [
@@ -162,7 +162,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '业务上下文', val: '明确', sub: '明确所属团队与产品' },
         ],
       },
-      d1: {
+      requirements: {
         title: '要求合理,但隐性门槛偏高',
         text: '硬性要求 (本科 + 3 年经验) 与薪资匹配。但要求中 "有大型 SaaS 协同编辑经验" 实质上将候选人池缩小至飞书、腾讯文档、石墨等少数公司在职/前员工,实际通过门槛高于显性 JD。',
         kpis: [
@@ -172,7 +172,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: 'JD 长度', val: '适中', sub: '490 字符' },
         ],
       },
-      d2: {
+      compensation: {
         title: '薪资 P82,期权与补贴齐备',
         text: '35-55K 月薪 × 16 薪 = 56-88 万年薪现金部分,叠加期权年化 15-25 万。该薪资位于同级别同地区市场分位 82,处于头部水平。住房补贴 2500/月、餐补 24/天 (工作日)、年度体检 2000 额度等。',
         kpis: [
@@ -182,7 +182,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '福利完备度', val: '5/5', sub: '全项目齐备' },
         ],
       },
-      d3: {
+      workload: {
         title: '节奏快,加班文化客观存在',
         text: 'JD 明确提及 "接受高强度工作节奏",团队员工脉脉/小红书反馈平均 21:30 下班,周末加班月均 2.4 次。AI 推荐方向年度需求量大,赶项目期可达 11-12-6。该维度评分偏低,但与薪资形成对价。',
         kpis: [
@@ -192,7 +192,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '远程灵活', val: '弹性 30%', sub: '可申请' },
         ],
       },
-      d4: {
+      companyHealth: {
         title: '财务稳健,技术氛围浓厚',
         text: '字节跳动 2024 年收入预计突破 1900 亿美元,经营性现金流持续为正,期权流动性在腾讯回购通道下良好。技术氛围与晋升机会均位于行业 Top 10%,但管理水平与员工口碑维度有所下滑。',
         kpis: [
@@ -202,7 +202,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '技术氛围', val: '89', sub: '技术博客活跃度高' },
         ],
       },
-      d5: {
+      industryOutlook: {
         title: '互联网内容平台,存量竞争期',
         text: '内容平台行业增速从 2023 年 24% 回落至 11%,进入存量竞争阶段。AI 视频生成与电商化成为新增长点。整体仍是高薪行业,但波动加大,2024 年裁员主要集中于游戏与教育线,核心技术岗位影响较小。',
         kpis: [
@@ -237,7 +237,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
       headcount: '1 人',
       posted: '3 天前',
     },
-    scores: { d0: 88, d1: 72, d2: 84, d3: 86, d4: 92, d5: 79 },
+    scores: { responsibility: 88, requirements: 72, compensation: 84, workload: 86, companyHealth: 92, industryOutlook: 79 },
     total: 84,
     grade: 'A+ · 强烈推荐',
     miniLabel: 'Stripe · 后端',
@@ -259,7 +259,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
       '英语为工作语言,日常沟通要求高',
     ],
     details: {
-      d0: {
+      responsibility: {
         title: '职责描述极其专业,技术深度突出',
         text: 'JD 提及 "设计支撑每秒 50 万 TPS 的支付路由系统"、"参与跨境结算清算逻辑设计" 等具体技术挑战,职责描述包含 6 项,平均 45 字,质量在 Top 5%。技术栈明确:Ruby + Go + Scala。',
         kpis: [
@@ -269,7 +269,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '业务上下文', val: '明确', sub: 'Payments Core 团队' },
         ],
       },
-      d1: {
+      requirements: {
         title: '门槛高,但符合 L4 定位',
         text: '5 年 + 经验 + 分布式系统 + 英语流利,要求看似严格但与 L4 Senior 定位一致。面试 6-8 周,通过率约 3%。建议提前准备 LeetCode Hard + 系统设计 + 行为面试。',
         kpis: [
@@ -279,7 +279,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '准备周期', val: '6-8 周', sub: '推荐' },
         ],
       },
-      d2: {
+      compensation: {
         title: 'USD 计价,合规化股票授予',
         text: '40-60K × 14 薪 = 56-84 万现金,叠加 RSU 4 年归属 25-40 万美元。福利包含全球商业保险、海外培训预算、年度学习津贴 1.2 万美元。补充医疗与父母保险覆盖。',
         kpis: [
@@ -289,7 +289,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '福利完备度', val: '5/5', sub: '国际标准' },
         ],
       },
-      d3: {
+      workload: {
         title: '外企节奏,WLB 同业稀缺',
         text: '日均工作时间 8.5 小时,无大小周,法定假期足额执行。Pager 轮值约 2 周/季度,夜间响应有补休。该维度评分在金融科技行业属于 Top 5%。',
         kpis: [
@@ -299,7 +299,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '远程灵活', val: '弹性 60%', sub: '每周 3 天' },
         ],
       },
-      d4: {
+      companyHealth: {
         title: '全球 TOP 金融科技,治理规范',
         text: 'Stripe 2024 年估值 700 亿美元,经营性现金流转正,处于 IPO 预备期。中国分部由 GM Patrick Tu 直管,本地决策权较大。员工口碑 91 分,管理水平 88 分,均位于外企前列。',
         kpis: [
@@ -309,7 +309,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '技术氛围', val: '93', sub: 'Top 1%' },
         ],
       },
-      d5: {
+      industryOutlook: {
         title: '金融科技 / 支付,稳健增长',
         text: '国内支付市场虽被双寡头主导,但跨境支付、Embedded Finance、企业级 API 仍处增长期。Stripe 在 SaaS 客户、Marketplace 业务上保持领先,中国分部聚焦中国出海企业,业务前景明确。',
         kpis: [
@@ -344,7 +344,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
       headcount: '3 人',
       posted: '5 天前',
     },
-    scores: { d0: 68, d1: 74, d2: 72, d3: 48, d4: 73, d5: 71 },
+    scores: { responsibility: 68, requirements: 74, compensation: 72, workload: 48, companyHealth: 73, industryOutlook: 71 },
     total: 68,
     grade: 'B · 谨慎考虑',
     miniLabel: '美团 · 增长 PM',
@@ -366,7 +366,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
       '前两年增长岗位整体满意度有所下滑',
     ],
     details: {
-      d0: {
+      responsibility: {
         title: '职责偏 KPI,业务细节较少',
         text: 'JD 包含 4 项职责,但多为 "提升 GMV"、"优化转化率" 等结果导向描述,缺少具体业务场景与负责模块说明。平均描述长度 22 字,处于行业均值。',
         kpis: [
@@ -376,7 +376,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '业务上下文', val: '弱', sub: '未提及具体场景' },
         ],
       },
-      d1: {
+      requirements: {
         title: '要求合理,与级别匹配',
         text: '2-4 年同岗位经验 + 本科要求合理,与 P2/3 级别匹配。强调数据敏感度与 SQL 能力,有 A/B 测试经验加分。整体门槛适中,候选池较大。',
         kpis: [
@@ -386,7 +386,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: 'JD 长度', val: '短', sub: '320 字符' },
         ],
       },
-      d2: {
+      compensation: {
         title: '薪资 P65,福利标准互联网水平',
         text: '28-42K × 14 薪 = 39-59 万年包,期权较少 (港股上市后已新发),整体处于行业 P65。福利包含餐补 30/天、租房补贴 2000/月、年度体检。',
         kpis: [
@@ -396,7 +396,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '福利完备度', val: '4/5', sub: '缺少海外培训' },
         ],
       },
-      d3: {
+      workload: {
         title: '强度大,WLB 较差',
         text: '团队普遍 9-9-6,核心活动期 (春节、双十一前后) 大小周明显。脉脉数据显示平均下班 21:50,周末加班 3.2 次/月。该维度仅 48 分,是综合评分主要拖累项。',
         kpis: [
@@ -406,7 +406,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '远程灵活', val: '弹性 10%', sub: '需审批' },
         ],
       },
-      d4: {
+      companyHealth: {
         title: '财务稳健但增速放缓',
         text: '美团港股市值约 6500 亿港币,经营性现金流持续为正,财务稳健性 81 分。但成长性维度仅 68 分,反映了 2024-2025 年外卖与到店业务进入存量竞争的客观现实。',
         kpis: [
@@ -416,7 +416,7 @@ export const MOCK_JOBS: JobAnalysis[] = [
           { label: '管理水平', val: '72', sub: '层级偏多' },
         ],
       },
-      d5: {
+      industryOutlook: {
         title: '本地生活,低速增长期',
         text: '本地生活行业进入存量竞争,2025 年增速预估 7%。配送效率、即时零售、AI 调度是当前主要竞争维度。增长岗位的指标压力随行业放缓而显著上升。',
         kpis: [

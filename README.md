@@ -6,6 +6,10 @@
 
 抓取走 **Chrome 远程调试协议（CDP）+ 持久化 profile**：脚本自动启动一个长驻 Chrome 进程，登录一次后 cookies 永久保存在本地，后续运行无感知。
 
+项目包含两部分：
+- **Python 后端**（`main.py` + `scraper/` + `external_data/` + `analyzers/`）：CLI 抓取 + QCC 整合 + LLM 分析
+- **Angular 前端**（`frontend/`）：可视化职位分析报告与候选人画像编辑；当前吃 mock 数据独立运行，后端 API 通了之后切换即可
+
 ## 为什么用 CDP（而不是 Playwright / opencli）
 
 | 维度 | CDP + `--remote-debugging-port` | Playwright Chromium | opencli `chrome.debugger.attach` |
@@ -38,6 +42,16 @@ job-analysis/
 │   ├── industry_outlook_agent.py   ← 子 agent 3：行业与赛道前景（基于模型常识，带 provenance）
 │   ├── industry_fetcher.py         ← 行业外部数据辅助获取（暂未纳入主流程）
 │   └── final_evaluation_agent.py   ← 汇总 agent
+├── frontend/                       ← Angular 19 + Material 前端（独立子项目）
+│   ├── src/app/
+│   │   ├── core/                   ← 数据模型 / mock 数据 / ApiService（mock ↔ 真实切换）
+│   │   ├── shared/                 ← 雷达图、评分工具等可复用组件
+│   │   ├── layout/                 ← 应用外壳 + 侧边历史抽屉
+│   │   └── features/
+│   │       ├── dashboard/          ← 主页：hero 搜索 + 评分总览 + 6 维 tab + 公司 modal
+│   │       ├── submit-progress/    ← SSE 进度页
+│   │       └── candidate-profile/  ← 候选人画像编辑
+│   └── src/environments/           ← useMock 开关
 ├── .chrome-debug-profile/          ← 自动创建，持久化登录态（已 gitignore）
 └── data/                           ← 每次运行产物（已 gitignore）
 ```
@@ -128,6 +142,58 @@ python main.py "https://www.zhipin.com/job_detail/another.html"
 
 `main.py` 目前不会启动 `analyzers/` 下的子 agent，也不会生成 `analysis_*.json`。运行结果集中保存在 `raw_page.html`、`raw_page_meta.json`、`cleaned.json` 和 `summary.json` 中。
 
+## 前端（Angular）
+
+`frontend/` 目录是一个独立的 Angular 19 + Material 应用，把 `data/` 下的分析产物渲染成可视化报告，并提供 URL 提交、SSE 进度展示、候选人画像编辑等交互入口。
+
+后端 API（FastAPI）还未实装时，前端默认走 **mock 模式**，直接吃内置静态数据就能跑出完整 UI；后端通了之后只需切 `useMock` 开关。
+
+### 环境
+
+只要装好 Node.js 18+（推荐 20 或 24）即可，不需要全局安装 `@angular/cli`，命令统一走 `npx`。
+
+```bash
+cd frontend
+npm install        # 首次安装依赖
+npx ng serve       # 启动开发服务器
+# → http://127.0.0.1:4200
+```
+
+### 路由
+
+| 路径 | 用途 |
+| --- | --- |
+| `/` | 主页：Hero 搜索条 + 历史中第一条职位的完整分析报告 |
+| `/results/:id` | 指定职位的分析报告（综合评分 + 6 维详情 + 雷达图） |
+| `/jobs/:taskId` | 任务进度页：SSE 推送 8 个阶段（抓取 / 登录 / QCC / 4 个 LLM 子模块 / 完成） |
+| `/profile` | 候选人画像编辑（基本信息 / 技能 / 职业目标 / 约束 / 偏好） |
+
+### 数据切换
+
+`frontend/src/environments/environment.ts` 控制 mock 与真实 API：
+
+```ts
+export const environment = {
+  useMock: true,                      // 改成 false 走真实 API
+  apiBase: 'http://127.0.0.1:8000',  // FastAPI 后端地址
+};
+```
+
+- mock 数据来源：`frontend/src/app/core/mock/jobs.mock.ts`（与设计稿 `index.html` 的 `JOBS` / `COMPANIES` 完全对齐，3 个职位 + 3 家公司）
+- 后端 schema 稳定后，统一在 `frontend/src/app/core/services/api.service.ts` 里加 adapter 把后端响应映射为前端 `JobAnalysis` / `Company` 类型，组件代码不动
+
+### 视觉风格
+
+紫色品牌主题（`#7132f5`）+ 自定义 CSS 变量，所有设计 token 集中在 `frontend/src/styles.scss`。Material 组件（Dialog / Expansion / FormField 等）只用功能、套上同一套主题色，保持与原型 `index.html` 视觉一致。
+
+### 构建
+
+```bash
+cd frontend
+npx ng build                            # 生产构建，产物在 frontend/dist/
+npx ng build --configuration development  # 开发构建（带 source map）
+```
+
 ## 常见问题
 
 **Q: 我已经在自己日常的 Chrome 里登录了 BOSS 直聘，脚本能复用吗？**
@@ -138,3 +204,9 @@ python main.py "https://www.zhipin.com/job_detail/another.html"
 
 **Q: 想要 headless 模式怎么办？**
 当前流程默认可见窗口，方便首次登录。如果你的 cookies 已经稳定，可以在 `cdp_scraper.launch_chrome_with_cdp` 的 args 里加 `"--headless=new"`。
+
+**Q: 前端运行报 `npm error could not determine executable to run`？**
+通常是在错误的目录跑 `npx ng ...`。`@angular/cli` 只装在 `frontend/node_modules/` 下，必须先 `cd frontend` 再跑命令。如果 `frontend/node_modules/` 为空，先 `npm install`。
+
+**Q: 前端报错或样式异常，但 mock 数据没改？**
+检查 `frontend/src/environments/environment.ts` 的 `useMock` 是不是被切到了 `false` —— 此时会去打真实 API，但后端尚未实装，请求都会失败。开发期保持 `useMock: true` 即可。
