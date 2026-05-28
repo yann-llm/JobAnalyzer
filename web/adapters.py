@@ -68,6 +68,7 @@ def build_job_analysis(result_id: str, *, include_details: bool = True) -> dict[
     payload: dict[str, Any] = {
         "id": result_id,
         "generatedAt": _text(analysis.get("generated_at")),
+        "sourceUrl": _text(analysis.get("url")),
         "title": title,
         "code": _job_code(analysis.get("url"), result_id),
         "level": "",

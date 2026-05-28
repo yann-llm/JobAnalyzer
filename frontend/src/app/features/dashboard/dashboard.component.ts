@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -40,6 +40,7 @@ export class DashboardComponent {
   private api = inject(ApiService);
   private route = inject(ActivatedRoute);
   private dialog = inject(MatDialog);
+  private heroSearch = viewChild(HeroSearchComponent);
   private allJobs$ = this.api.listResults().pipe(
     shareReplay({ bufferSize: 1, refCount: true })
   );
@@ -89,7 +90,61 @@ export class DashboardComponent {
     });
   }
 
+  reanalyze(job: JobAnalysis): void {
+    this.heroSearch()?.reanalyze(job.sourceUrl);
+  }
+
+  exportReport(job: JobAnalysis): void {
+    const blob = new Blob([this.reportMarkdown(job)], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${this.safeFileName(job.title || job.id)}-analysis.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   selectDimensionTab(id: DimensionId): void {
     this.activeAnalysisTab.set(id);
+  }
+
+  private reportMarkdown(job: JobAnalysis): string {
+    const lines = [
+      `# ${job.title}`,
+      '',
+      `- 编号：${job.code}`,
+      `- 等级：${job.level || '未提供'}`,
+      `- 综合评分：${job.total}`,
+      `- 建议：${job.grade}`,
+      job.generatedAt ? `- 生成时间：${job.generatedAt}` : '',
+      job.sourceUrl ? `- 原始链接：${job.sourceUrl}` : '',
+      '',
+      '## 摘要',
+      ...job.summary.map((item) => `- ${item}`),
+      '',
+      '## 亮点',
+      ...job.pros.map((item) => `- ${item}`),
+      '',
+      '## 风险',
+      ...job.cons.map((item) => `- ${item}`),
+      '',
+      '## 维度评分',
+      ...Object.entries(job.scores).map(([key, value]) => `- ${key}: ${value}`),
+      '',
+      '## 维度详情',
+      ...Object.entries(job.details).flatMap(([key, detail]) => [
+        '',
+        `### ${key} · ${detail.title}`,
+        detail.text,
+        '',
+        ...detail.kpis.filter((kpi) => kpi.label || kpi.val).map((kpi) => `- ${kpi.label}: ${kpi.val}${kpi.sub ? ` (${kpi.sub})` : ''}`),
+      ]),
+      '',
+    ];
+    return lines.filter((line) => line !== '').join('\n') + '\n';
+  }
+
+  private safeFileName(value: string): string {
+    return value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-').slice(0, 80) || 'job';
   }
 }

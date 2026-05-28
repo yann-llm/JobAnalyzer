@@ -1,11 +1,22 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  inject,
+  input,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { ApiService } from '../../../core/services/api.service';
 import { RadarChartComponent } from '../../../shared/radar-chart/radar-chart.component';
+import { AnalyzeProgressDialogComponent } from '../analyze-progress-dialog/analyze-progress-dialog.component';
 import type { JobAnalysis } from '../../../core/models/job.model';
 
 /**
@@ -22,12 +33,14 @@ import type { JobAnalysis } from '../../../core/models/job.model';
 })
 export class HeroSearchComponent {
   private api = inject(ApiService);
-  private router = inject(Router);
+  private dialog = inject(MatDialog);
   private destroyRef = inject(DestroyRef);
 
   readonly job = input.required<JobAnalysis>();
+  readonly inputEl = viewChild<ElementRef<HTMLInputElement>>('urlField');
   readonly urlInput = signal<string>('');
   readonly submitting = signal<boolean>(false);
+  readonly submitError = signal<string | null>(null);
 
   readonly tagStyle = computed(() => {
     const cls = this.job().miniTag.cls;
@@ -42,14 +55,42 @@ export class HeroSearchComponent {
 
   submit(): void {
     const url = this.urlInput().trim();
+    this.submitUrl(url);
+  }
+
+  reanalyze(sourceUrl?: string): void {
+    if (sourceUrl) {
+      this.urlInput.set(sourceUrl);
+      this.submitUrl(sourceUrl);
+      return;
+    }
+    this.submitError.set('当前记录缺少原始职位链接，请粘贴链接后重新分析');
+    this.inputEl()?.nativeElement.focus();
+    this.inputEl()?.nativeElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  private submitUrl(url: string): void {
     if (!url || this.submitting()) return;
+    this.submitError.set(null);
     this.submitting.set(true);
     this.api.submitAnalysis(url).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res) => {
         this.submitting.set(false);
-        this.router.navigate(['/jobs', res.taskId]);
+        this.openProgressDialog(res.taskId);
       },
-      error: () => this.submitting.set(false),
+      error: (err) => {
+        this.submitting.set(false);
+        this.submitError.set(String(err?.message ?? err ?? '提交失败'));
+      },
+    });
+  }
+
+  private openProgressDialog(taskId: string): void {
+    this.dialog.open(AnalyzeProgressDialogComponent, {
+      data: { taskId },
+      panelClass: 'jb-analyze-progress-dialog',
+      maxWidth: 'calc(100vw - 32px)',
+      width: '560px',
     });
   }
 }

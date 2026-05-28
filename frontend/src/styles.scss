@@ -121,3 +121,8 @@ button { font-family: inherit; cursor: pointer; }
 .mat-mdc-outlined-button.mat-mdc-button-base {
   border-radius: 10px;
 }
+
+.jb-analyze-progress-dialog .mat-mdc-dialog-container .mdc-dialog__surface {
+  border-radius: 14px;
+  overflow: hidden;
+}

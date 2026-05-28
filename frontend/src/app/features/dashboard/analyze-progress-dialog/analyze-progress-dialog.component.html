@@ -1,0 +1,63 @@
+<section class="dialog">
+  <header class="header">
+    <div>
+      <p class="eyebrow">ANALYSIS TASK</p>
+      <h2 class="title">正在分析职位</h2>
+    </div>
+    <div class="percent">{{ percent() }}%</div>
+  </header>
+
+  <div class="task-row">
+    <span class="task-label">任务</span>
+    <span class="task-id">{{ taskId }}</span>
+  </div>
+
+  <div class="progress-bar" aria-hidden="true">
+    <div class="progress-bar-fill" [style.width.%]="percent()"></div>
+  </div>
+
+  @if (currentEvent(); as event) {
+    <div class="current" [class.current-login]="event.stage === 'waiting_login'">
+      <div class="current-main">{{ event.message }}</div>
+      @if (currentDetail()) {
+        <div class="current-detail">{{ currentDetail() }}</div>
+      }
+    </div>
+  }
+
+  <ol class="stages">
+    @for (stage of stageState(); track stage.key) {
+      <li class="stage" [class]="'stage-' + stage.status">
+        <span class="stage-dot">
+          @switch (stage.status) {
+            @case ('done') { ✓ }
+            @case ('active') { ⟳ }
+            @case ('error') { × }
+            @default { · }
+          }
+        </span>
+        <span class="stage-label">{{ stage.label }}</span>
+      </li>
+    }
+  </ol>
+
+  @if (latestEvents().length) {
+    <div class="event-log">
+      @for (event of latestEvents(); track $index) {
+        <div class="event-row">
+          <span class="event-stage">{{ event.stage }}</span>
+          <span class="event-message">{{ event.message }}</span>
+        </div>
+      }
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <div class="error-box">
+      <strong>分析失败：</strong>{{ errorMessage() }}
+    </div>
+    <footer class="footer">
+      <button class="ghost-button" type="button" (click)="close()">关闭</button>
+    </footer>
+  }
+</section>

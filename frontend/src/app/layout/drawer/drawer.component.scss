@@ -47,20 +47,56 @@
   text-transform: uppercase;
 }
 
-.drawer-section {
-  padding: 16px 14px 8px;
-  font-size: 11px;
-  font-weight: 600;
+.drawer-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 14px 12px 8px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--surface-3);
+}
+
+.drawer-tab {
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   color: var(--muted);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+
+  &:hover {
+    color: var(--fg-2);
+  }
+
+  &.active {
+    background: var(--surface);
+    color: var(--brand-dark);
+    box-shadow: var(--shadow-sm);
+  }
 
   .count {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 99px;
+    background: rgba(104, 107, 130, 0.12);
+    color: inherit;
+    display: inline-grid;
+    place-items: center;
     font-family: var(--font-mono);
-    color: var(--muted-2);
+    font-size: 10px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
   }
 }
 

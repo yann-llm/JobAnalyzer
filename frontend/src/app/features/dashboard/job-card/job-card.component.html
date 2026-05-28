@@ -16,19 +16,11 @@
         </svg>
         查看公司详情
       </button>
-      <button class="btn-ghost" type="button">
+      <button class="btn-ghost" type="button" [class.btn-favorite-active]="isFavorite()" (click)="toggleFavorite()">
         <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
           <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2v16z" />
         </svg>
-        收藏
-      </button>
-      <button class="btn-ghost" type="button">
-        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" />
-          <polyline points="16 6 12 2 8 6" />
-          <line x1="12" y1="2" x2="12" y2="15" />
-        </svg>
-        分享
+        {{ isFavorite() ? '已收藏' : '收藏' }}
       </button>
     </div>
   </div>

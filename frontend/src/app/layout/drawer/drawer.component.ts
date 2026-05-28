@@ -1,12 +1,15 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
+import { FavoriteJobsService } from '../../core/services/favorite-jobs.service';
 import { scoreClass } from '../../shared/score-utils';
 import type { JobAnalysis } from '../../core/models/job.model';
+
+type DrawerTab = 'history' | 'favorites';
 
 /**
  * 侧边栏 —— 分析历史列表 + 品牌头 + 状态条。
@@ -22,9 +25,11 @@ import type { JobAnalysis } from '../../core/models/job.model';
 })
 export class DrawerComponent {
   private api = inject(ApiService);
+  private favorites = inject(FavoriteJobsService);
   private router = inject(Router);
 
   readonly jobs = toSignal(this.api.listResults(), { initialValue: [] as JobAnalysis[] });
+  readonly activeTab = signal<DrawerTab>('history');
   private readonly currentUrl = toSignal(
     this.router.events.pipe(
       filter((event): event is NavigationEnd => event instanceof NavigationEnd),
@@ -33,11 +38,20 @@ export class DrawerComponent {
     ),
     { initialValue: this.router.url }
   );
-  readonly count = computed(() => this.jobs().length);
+  readonly favoriteCount = this.favorites.count;
+  readonly visibleJobs = computed(() => {
+    if (this.activeTab() === 'history') return this.jobs();
+    const favoriteIds = this.favorites.favoriteIds();
+    return this.jobs().filter((job) => favoriteIds.has(job.id));
+  });
+  readonly count = computed(() => this.visibleJobs().length);
+  readonly emptyText = computed(() =>
+    this.activeTab() === 'favorites' ? '还没有收藏职位' : '还没有分析记录'
+  );
 
   /** 当前选中职位 id（从 URL 解析）。空就高亮第一个。 */
   readonly activeId = computed(() => {
-    const list = this.jobs();
+    const list = this.visibleJobs();
     if (!list.length) return null;
     const segments = this.currentUrl().split('/').filter(Boolean);
     if (segments[0] === 'results' && segments[1]) return segments[1];
@@ -50,5 +64,9 @@ export class DrawerComponent {
   firstLocation(job: JobAnalysis): string {
     const loc = job.meta.find((m) => m.ico === 'location');
     return loc?.label.split(' · ')[0] ?? '';
+  }
+
+  selectTab(tab: DrawerTab): void {
+    this.activeTab.set(tab);
   }
 }

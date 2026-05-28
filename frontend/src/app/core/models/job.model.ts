@@ -80,6 +80,7 @@ export interface MiniTag {
 export interface JobAnalysis {
   id: string;
   generatedAt?: string;
+  sourceUrl?: string;
   title: string;
   code: string;
   level: string;

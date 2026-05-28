@@ -83,6 +83,7 @@ DIMENSIONS = [
 interface JobAnalysis {
   id: string;            // 路径用，等同后端 slug（urlparse 后的 host_path）
   generatedAt?: string;  // 分析生成时间，后端从内部 generated_at 转成 camelCase 后输出；建议 ISO 字符串
+  sourceUrl?: string;    // 原始职位链接，用于前端「重新分析」；历史数据缺失时可不返回
   title: string;         // 职位名（如 "高级前端工程师"）
   code: string;          // 短 code（如 "BYT-FE-2086"），来源可用 job 内部编号或 URL 末段
   level: string;         // 级别（"P6 / 7"），可空字符串

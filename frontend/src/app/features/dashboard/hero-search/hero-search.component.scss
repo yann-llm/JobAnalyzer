@@ -32,6 +32,12 @@
   margin-bottom: 12px;
 }
 
+.submit-error {
+  margin: -2px 0 10px;
+  color: var(--red-text);
+  font-size: 12px;
+}
+
 .search-input {
   flex: 1;
   height: 44px;
