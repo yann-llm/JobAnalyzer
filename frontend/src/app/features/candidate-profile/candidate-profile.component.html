@@ -1,0 +1,108 @@
+<main class="main">
+  <header class="page-head">
+    <div class="page-icon">◆</div>
+    <div>
+      <h1 class="page-title">候选人画像</h1>
+      <p class="page-sub">设置你的工作背景、目标与偏好。LLM 分析时会将职位与你的画像匹配，给出个性化建议。</p>
+    </div>
+  </header>
+
+  <mat-accordion class="profile-accordion" multi>
+    <mat-expansion-panel expanded>
+      <mat-expansion-panel-header>
+        <mat-panel-title>基本信息</mat-panel-title>
+        <mat-panel-description>工作年限 / 当前薪资 / 城市</mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>工作年限</mat-label>
+          <input matInput type="number" [ngModel]="years()" (ngModelChange)="years.set($event)" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>当前薪资</mat-label>
+          <input matInput [ngModel]="currentSalary()" (ngModelChange)="currentSalary.set($event)" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>当前城市</mat-label>
+          <input matInput [ngModel]="currentCity()" (ngModelChange)="currentCity.set($event)" />
+        </mat-form-field>
+      </div>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>技能</mat-panel-title>
+        <mat-panel-description>编程语言 / 框架 / 领域经验</mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <div class="chip-row">
+        <label class="chip-label">编程语言</label>
+        <mat-chip-set>
+          @for (lang of languages(); track lang) {
+            <mat-chip-row (removed)="removeLanguage(lang)">
+              {{ lang }}
+              <button matChipRemove aria-label="删除">×</button>
+            </mat-chip-row>
+          }
+        </mat-chip-set>
+        <input #langInput class="chip-input" placeholder="回车添加" (keydown.enter)="addLanguage(langInput); $event.preventDefault()" />
+      </div>
+
+      <div class="chip-row">
+        <label class="chip-label">框架</label>
+        <mat-chip-set>
+          @for (f of frameworks(); track f) {
+            <mat-chip-row>{{ f }}</mat-chip-row>
+          }
+        </mat-chip-set>
+      </div>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>职业目标</mat-panel-title>
+        <mat-panel-description>短期 / 长期目标 / 薪资底线</mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <div class="form-grid">
+        <mat-form-field appearance="outline" class="full">
+          <mat-label>短期目标</mat-label>
+          <input matInput [ngModel]="shortGoal()" (ngModelChange)="shortGoal.set($event)" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full">
+          <mat-label>长期目标</mat-label>
+          <input matInput [ngModel]="longGoal()" (ngModelChange)="longGoal.set($event)" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>薪资底线</mat-label>
+          <input matInput [ngModel]="minSalary()" (ngModelChange)="minSalary.set($event)" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>理想薪资</mat-label>
+          <input matInput [ngModel]="idealSalary()" (ngModelChange)="idealSalary.set($event)" />
+        </mat-form-field>
+      </div>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>约束</mat-panel-title>
+        <mat-panel-description>加班接受度 / 工作模式 / 出差</mat-panel-description>
+      </mat-expansion-panel-header>
+      <p class="placeholder">表单字段开发中…</p>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>偏好</mat-panel-title>
+        <mat-panel-description>福利 / 成长方向 / 股权态度</mat-panel-description>
+      </mat-expansion-panel-header>
+      <p class="placeholder">表单字段开发中…</p>
+    </mat-expansion-panel>
+  </mat-accordion>
+
+  <div class="actions">
+    <button mat-flat-button color="primary" (click)="save()">保存</button>
+  </div>
+</main>

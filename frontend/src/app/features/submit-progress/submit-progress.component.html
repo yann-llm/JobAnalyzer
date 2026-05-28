@@ -1,0 +1,49 @@
+<main class="main">
+  <section class="progress-panel">
+    <header class="header">
+      <div class="header-left">
+        <div class="header-icon">⟳</div>
+        <div>
+          <h1 class="header-title">正在分析职位</h1>
+          <p class="header-sub">任务 ID: <span class="taskid">{{ taskId() }}</span></p>
+        </div>
+      </div>
+      <div class="header-percent">{{ percent() }}%</div>
+    </header>
+
+    <div class="progress-bar">
+      <div class="progress-bar-fill" [style.width.%]="percent()"></div>
+    </div>
+
+    <ol class="stages">
+      @for (stage of stageState(); track stage.key) {
+        <li class="stage" [class]="'stage-' + stage.status">
+          <span class="stage-dot">
+            @switch (stage.status) {
+              @case ('done') { ✓ }
+              @case ('active') { ⟳ }
+              @case ('error') { × }
+              @default { · }
+            }
+          </span>
+          <span class="stage-label">{{ stage.label }}</span>
+          @if (stage.key === 'waiting_login' && stage.status === 'active') {
+            <span class="stage-hint">请在弹出的 Chrome 窗口完成 BOSS 直聘登录</span>
+          }
+        </li>
+      }
+    </ol>
+
+    @if (errorMessage()) {
+      <div class="error-box">
+        <strong>分析失败：</strong>{{ errorMessage() }}
+      </div>
+    }
+
+    <footer class="footer">
+      <p class="tip">
+        分析过程会自动启动 Chrome 浏览器实例。如首次抓取请保持窗口可见，登录后流程将自动继续。
+      </p>
+    </footer>
+  </section>
+</main>

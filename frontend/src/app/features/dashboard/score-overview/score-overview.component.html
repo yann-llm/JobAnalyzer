@@ -1,0 +1,39 @@
+<section class="score-overview">
+  <div class="total-score-wrap">
+    <div class="total-score-label">综合评分 · OVERALL SCORE</div>
+    <div class="total-score-circle">
+      <svg class="total-score-svg" viewBox="0 0 200 200">
+        <defs>
+          <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#7132f5" />
+            <stop offset="100%" stop-color="#5b1ecf" />
+          </linearGradient>
+        </defs>
+        <circle class="total-score-bg" cx="100" cy="100" [attr.r]="RADIUS" />
+        <circle class="total-score-fg" cx="100" cy="100" [attr.r]="RADIUS" [attr.stroke-dasharray]="arcDashArray()" />
+      </svg>
+      <div class="total-score-text">
+        <div class="total-score-num">{{ job().total }}</div>
+        <div class="total-score-out">/ 100 分</div>
+        <div class="total-score-grade">{{ job().grade }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dim-grid">
+    @for (d of dimensions; track d.id) {
+      @let score = job().scores[d.id];
+      @let cls = scoreClass(score);
+      <div class="dim-card">
+        <div class="dim-card-head">
+          <div class="dim-card-name">{{ d.name }}</div>
+          <div class="dim-card-score" [class]="cls.color">{{ score }}</div>
+        </div>
+        <div class="dim-card-bar">
+          <div class="dim-card-bar-fill" [class]="cls.bar" [style.width.%]="score"></div>
+        </div>
+        <div class="dim-card-note">{{ cls.grade }}</div>
+      </div>
+    }
+  </div>
+</section>

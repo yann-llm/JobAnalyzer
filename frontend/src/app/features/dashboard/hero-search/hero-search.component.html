@@ -1,0 +1,60 @@
+<section class="hero">
+  <div class="hero-left">
+    <h1 class="hero-title">输入职位链接，开始分析</h1>
+    <p class="hero-sub">
+      粘贴 BOSS 直聘、拉勾、猎聘等平台的职位地址。我们从职责质量、要求合理性、薪酬福利、工作强度、公司评分、行业评分六个维度评估，给出 0–100 综合得分。
+    </p>
+    <div class="search-row">
+      <input
+        class="search-input"
+        type="url"
+        placeholder="https://www.zhipin.com/job_detail/xxx.html"
+        [ngModel]="urlInput()"
+        (ngModelChange)="urlInput.set($event)"
+        (keydown.enter)="submit()"
+      />
+      <button class="btn-primary" type="button" (click)="submit()" [disabled]="submitting()">
+        {{ submitting() ? '提交中…' : '开始分析' }}
+        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14" />
+          <path d="M12 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+    <div class="search-tips">
+      <span class="tip">
+        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4l3 2" /></svg>
+        平均耗时 8 秒
+      </span>
+      <span class="tip">
+        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l3 3 5-5" /><path d="M3 5h18" /><path d="M3 19h12" /></svg>
+        支持 8 大招聘平台
+      </span>
+      <span class="tip">
+        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path d="M9 12l2 2 4-4" /></svg>
+        数据本地缓存，不上传
+      </span>
+    </div>
+  </div>
+
+  <div class="mini-radar-card">
+    <div class="mini-radar-info">
+      <div class="mini-radar-info-title">当前 · 综合评分</div>
+      <div class="mini-radar-info-score">{{ job().total }}</div>
+      <div class="mini-radar-info-label">{{ job().miniLabel }}</div>
+      <span class="mini-radar-info-tag" [style.background]="tagStyle().background" [style.color]="tagStyle().color">
+        {{ job().miniTag.text }}
+      </span>
+    </div>
+    <jb-radar-chart
+      class="mini-radar-svg"
+      [scores]="job().scores"
+      [showLabels]="false"
+      [cx]="50"
+      [cy]="50"
+      [r]="32"
+      [viewBoxW]="100"
+      [viewBoxH]="100"
+    />
+  </div>
+</section>

@@ -1,0 +1,241 @@
+:host { display: block; }
+
+.modal {
+  background: var(--surface);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 88vh;
+}
+
+.loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.modal-head {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.modal-head-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.modal-head-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.modal-head-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.modal-head-meta {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  gap: 10px;
+}
+
+.modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+
+  &:hover { background: var(--surface-3); color: var(--fg); }
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.badge-green   { background: var(--green-bg);   color: var(--green-text); }
+.badge-neutral { background: rgba(104, 107, 130, 0.12); color: var(--fg-2); }
+
+.modal-body {
+  padding: 18px 22px 22px;
+  overflow-y: auto;
+}
+
+.modal-section {
+  margin-bottom: 22px;
+
+  &:last-child { margin-bottom: 0; }
+}
+
+.modal-section-h {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.modal-section-h-bar {
+  width: 3px;
+  height: 12px;
+  background: var(--brand);
+  border-radius: 2px;
+}
+
+.co-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 18px;
+}
+
+.co-info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.co-info-key {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.co-info-val {
+  font-size: 13px;
+  color: var(--fg);
+}
+
+.co-score-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.co-score-cell {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+}
+
+.co-score-cell-label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.co-score-cell-val {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.co-score-cell-bar {
+  height: 4px;
+  background: var(--surface-3);
+  border-radius: 99px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.co-score-cell-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+}
+
+.summary-p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--fg-2);
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.industry-card {
+  background: linear-gradient(135deg, var(--brand-soft), var(--surface));
+  border: 1px solid rgba(113, 50, 245, 0.18);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.industry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.industry-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brand-dark);
+}
+
+.industry-score {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.industry-p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--fg-2);
+  margin: 0 0 10px;
+}
+
+.industry-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.industry-metric {
+  text-align: center;
+}
+
+.industry-metric-val {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.industry-metric-label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}

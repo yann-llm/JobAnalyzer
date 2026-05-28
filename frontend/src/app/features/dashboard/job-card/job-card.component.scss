@@ -1,0 +1,120 @@
+:host { display: contents; }
+
+.job-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow-md);
+}
+
+.job-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.job-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.job-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.job-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.badge-green   { background: var(--green-bg);   color: var(--green-text); }
+.badge-orange  { background: var(--orange-bg);  color: var(--orange-text); }
+.badge-neutral { background: rgba(104, 107, 130, 0.12); color: var(--fg-2); }
+.badge-purple  { background: var(--brand-subtle); color: var(--brand-dark); }
+
+.job-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-outline {
+  height: 32px;
+  padding: 0 12px;
+  background: var(--surface);
+  color: var(--brand-dark);
+  border: 1px solid var(--brand-dark);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.12s ease;
+  cursor: pointer;
+
+  &:hover { background: var(--brand-soft); }
+}
+
+.btn-ghost {
+  height: 32px;
+  padding: 0 12px;
+  background: rgba(148, 151, 169, 0.08);
+  color: var(--fg);
+  border: none;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.12s ease;
+  cursor: pointer;
+
+  &:hover { background: rgba(148, 151, 169, 0.16); }
+}
+
+.job-meta {
+  display: flex;
+  gap: 10px 18px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--fg-2);
+
+  .meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+
+    .ico { color: var(--muted-2); }
+  }
+
+  .salary {
+    color: var(--orange-text);
+    font-weight: 600;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
