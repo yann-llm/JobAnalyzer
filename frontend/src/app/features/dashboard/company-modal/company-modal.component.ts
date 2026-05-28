@@ -6,7 +6,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ApiService } from '../../../core/services/api.service';
 import { scoreClass } from '../../../shared/score-utils';
 import { COMPANY_SCORE_DIMENSIONS } from '../../../core/models/job.model';
-import type { CompanyScoreId, CompanyScores } from '../../../core/models/job.model';
+import type { CompanyScores } from '../../../core/models/job.model';
 
 interface CompanyModalData {
   companyId: string;
@@ -35,12 +35,13 @@ export class CompanyModalComponent {
 
   /**
    * 把 scores 转成 [中文名, 分数] 顺序数组。
-   * 顺序按 COMPANY_SCORE_DIMENSIONS（前端固定语序），key 缺失时跳过。
+   * 顺序按 COMPANY_SCORE_DIMENSIONS（前端固定语序）；后端可能只返回部分 key（CompanyScores 是 Partial），
+   * 缺失的维度跳过不渲染。
    */
   scoreEntries(scores: CompanyScores): { name: string; val: number }[] {
     return COMPANY_SCORE_DIMENSIONS
-      .filter((d) => typeof scores[d.id] === 'number')
-      .map((d) => ({ name: d.name, val: scores[d.id] }));
+      .map((d) => ({ name: d.name, val: scores[d.id] }))
+      .filter((entry): entry is { name: string; val: number } => typeof entry.val === 'number');
   }
 
   close(): void {
