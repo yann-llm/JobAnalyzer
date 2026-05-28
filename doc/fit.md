@@ -296,6 +296,56 @@ data: {"stage":"done","message":"分析完成","percent":100,"slug":"www.zhipin.
 
 当检测到 Chrome 跳到 login 页时，发一帧 `{ stage: 'waiting_login', message: '请在 Chrome 窗口完成登录' }`，前端会把这个阶段高亮成橙色提示。
 
+**当前 FastAPI 实现的真实进度流**
+
+后端 `web/app.py` 会在 `POST /api/analyze` 后立即创建后台任务；任务内部调用 `main.analyze_url(..., progress_callback=...)`，由 CLI 主流程在真实节点上推送进度。前端只需要订阅同一个 `taskId` 的 SSE，不需要轮询。
+
+典型事件顺序如下（某些阶段可能因数据情况略过，例如页面不需要登录时不会出现 `waiting_login`，职位页已经包含工商信息时可能不会明显停留在 `scraping_company`）：
+
+```text
+launching_chrome   5%   启动 Chrome 调试实例
+scraping_job       20%  抓取职位页面正文
+waiting_login      15%  请在 Chrome 窗口完成登录（仅登录/安全校验时出现）
+scraping_job       35%  清洗职位页面正文
+scraping_company   42%  抓取公司详情页
+qcc_enrich         55%  企查查公司信息整合
+analyzing          70%  LLM 分析：职位综合价值       detail=job_value
+analyzing          80%  LLM 分析：公司风险           detail=company_risk
+analyzing          88%  LLM 分析：行业前景           detail=industry_outlook
+analyzing          95%  LLM 分析：综合评估           detail=final_evaluation
+done               100% 分析完成                    slug=<resultId>
+```
+
+说明：
+
+- `percent` 是展示用进度，不保证严格单调；例如进入登录等待时可能从 `20` 回到 `15`，前端可以直接展示最新帧，或自行取最大值。
+- `waiting_login` 表示后端正在阻塞等待用户在本机 Chrome 完成登录/安全校验；前端应保持 SSE 连接，不要主动取消任务。
+- `analyzing` 阶段通过 `detail` 区分具体子 agent：`job_value` / `company_risk` / `industry_outlook` / `final_evaluation`。
+- `done` 必须是具名事件；前端收到后读取 `slug`，跳转到 `/results/:slug`，然后关闭 `EventSource`。
+- `error` 使用普通 message 帧（不是具名事件），字段形如 `{ "stage": "error", "message": "...", "percent": 100, "detail": "scrape_error" }`；前端收到后展示错误并关闭连接即可。
+
+**前端对接示例**
+
+```ts
+const es = new EventSource(`${apiBase}/api/analyze/${taskId}/stream`);
+
+es.onmessage = (ev) => {
+  const event = JSON.parse(ev.data) as AnalyzeProgressEvent;
+  if (event.stage === 'error') {
+    es.close();
+    // 展示 event.message
+    return;
+  }
+  // 更新当前阶段、message、percent、detail
+};
+
+es.addEventListener('done', (ev) => {
+  const event = JSON.parse((ev as MessageEvent).data) as AnalyzeProgressEvent;
+  es.close();
+  // router.navigate(['/results', event.slug])
+});
+```
+
 ---
 
 ### 3.6 候选人画像 ⚠️ 前端尚未接入

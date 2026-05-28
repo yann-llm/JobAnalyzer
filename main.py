@@ -27,7 +27,7 @@ import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 # Force UTF-8 on Windows consoles so Chinese error messages don't crash with GBK.
@@ -44,6 +44,30 @@ from scraper.job_scraper import default_profile_dir
 PROJECT_DIR = Path(__file__).resolve().parent
 DATA_DIR = PROJECT_DIR / "data"
 DEFAULT_CDP_PORT = 9222
+ProgressCallback = Callable[[dict[str, Any]], None]
+
+
+def emit_progress(
+    progress_callback: ProgressCallback | None,
+    stage: str,
+    message: str,
+    percent: int,
+    *,
+    detail: str | None = None,
+    slug: str | None = None,
+) -> None:
+    if not progress_callback:
+        return
+    event: dict[str, Any] = {
+        "stage": stage,
+        "message": message,
+        "percent": max(0, min(100, int(percent))),
+    }
+    if detail:
+        event["detail"] = detail
+    if slug:
+        event["slug"] = slug
+    progress_callback(event)
 
 
 def now_utc() -> datetime:
@@ -238,6 +262,7 @@ def run_analyzers(
     url: str,
     base_dir: Path,
     job_cleaned: dict[str, Any],
+    progress_callback: ProgressCallback | None = None,
 ) -> dict[str, Any] | None:
     """Run all 4 analyzers (job_value/company_risk/industry_outlook/final) and persist.
 
@@ -262,8 +287,21 @@ def run_analyzers(
 
     # Sub-module analyses run sequentially; each one calls chat_json once.
     module_analyses: dict[str, Any] = {}
+    analyzer_progress = {
+        "job_value": ("职位综合价值", 70),
+        "company_risk": ("公司风险", 80),
+        "industry_outlook": ("行业前景", 88),
+    }
     for name, analyzer_fn in ANALYZER_REGISTRY.items():
         print(f"  [分析] 运行 {name}...")
+        label, percent = analyzer_progress.get(name, (name, 75))
+        emit_progress(
+            progress_callback,
+            "analyzing",
+            f"LLM 分析：{label}",
+            percent,
+            detail=name,
+        )
         try:
             module_analyses[name] = run_analyzer(
                 analyzer_fn,
@@ -284,6 +322,13 @@ def run_analyzers(
 
     # Final evaluation aggregates the sub-module analyses.
     print("  [分析] 运行 final_evaluation...")
+    emit_progress(
+        progress_callback,
+        "analyzing",
+        "LLM 分析：综合评估",
+        95,
+        detail="final_evaluation",
+    )
     try:
         final = analyze_final_evaluation(url, module_analyses, candidate_profile)
     except Exception as exc:  # noqa: BLE001
@@ -313,6 +358,7 @@ def enrich_business_info_from_company_page(
     port: int,
     prefer_existing_tab: bool,
     login_wait_timeout: int,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     """Fetch the BOSS company page when the job page hides the credit code."""
     business_info = cleaned.setdefault("business_info", {})
@@ -330,6 +376,7 @@ def enrich_business_info_from_company_page(
             break
         seen_urls.add(next_url)
         print(f"[抓取] 公司工商详情页: {next_url}")
+        emit_progress(progress_callback, "scraping_company", "抓取公司详情页", 42)
         try:
             company_page = fetch_job_page(
                 next_url,
@@ -338,6 +385,7 @@ def enrich_business_info_from_company_page(
                 screenshot_dir=None,
                 prefer_existing_tab=prefer_existing_tab,
                 login_wait_timeout=login_wait_timeout,
+                progress_callback=progress_callback,
             )
         except ScraperError as exc:
             business_info["company_detail_fetch_error"] = str(exc)
@@ -367,6 +415,7 @@ def analyze_url(
     prefer_existing_tab: bool = True,
     login_wait_timeout: int = 600,
     run_analysis: bool = True,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     """Run scrape -> clean -> external company enrichment and persist artifacts."""
     generated_at = now_utc()
@@ -377,7 +426,9 @@ def analyze_url(
 
     print(f"[抓取] {url}")
     print(f"[抓取] Chrome profile: {profile_path}  port: {port}")
+    emit_progress(progress_callback, "launching_chrome", "启动 Chrome 调试实例", 5)
     try:
+        emit_progress(progress_callback, "scraping_job", "抓取职位页面正文", 20)
         page = fetch_job_page(
             url,
             profile_dir=profile_path,
@@ -385,6 +436,7 @@ def analyze_url(
             screenshot_dir=(base_dir / "screenshot") if keep_screenshot else None,
             prefer_existing_tab=prefer_existing_tab,
             login_wait_timeout=login_wait_timeout,
+            progress_callback=progress_callback,
         )
     except ScraperError as exc:
         message = f"抓取失败：{exc}"
@@ -404,6 +456,7 @@ def analyze_url(
         f"title={page.title!r}  body={page.meta.get('extracted_chars')} 字  "
         f"launched_chrome={page.meta.get('launched_chrome')}"
     )
+    emit_progress(progress_callback, "scraping_job", "清洗职位页面正文", 35)
 
     if page.html:
         write_text(base_dir / "raw_page.html", page.html)
@@ -416,9 +469,11 @@ def analyze_url(
         port=port,
         prefer_existing_tab=prefer_existing_tab,
         login_wait_timeout=login_wait_timeout,
+        progress_callback=progress_callback,
     )
     sync_page_content_business_info(cleaned)
     print("[整合] 清洗完成，准备整合外部公司数据...")
+    emit_progress(progress_callback, "qcc_enrich", "企查查公司信息整合", 55)
     cleaned = enrich_external_data(cleaned)
     sync_page_content_business_info(cleaned)
     qcc = (cleaned.get("external") or {}).get("qcc")
@@ -469,7 +524,7 @@ def analyze_url(
     analysis_bundle = None
     if run_analysis:
         job_cleaned = final_page_content(cleaned)
-        analysis_bundle = run_analyzers(url, base_dir, job_cleaned)
+        analysis_bundle = run_analyzers(url, base_dir, job_cleaned, progress_callback=progress_callback)
 
     summary = {
         "url": url,
@@ -490,6 +545,7 @@ def analyze_url(
             "candidate_profile_used": bool(analysis_bundle and analysis_bundle.get("candidate_profile_used")),
         },
     }
+    emit_progress(progress_callback, "done", "分析完成", 100, slug=base_dir.name)
     return {
         "summary": summary,
         "cleaned": cleaned,

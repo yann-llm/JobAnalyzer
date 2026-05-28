@@ -40,7 +40,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.error import URLError
 from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
@@ -625,6 +625,7 @@ def fetch_via_cdp(
     settle_seconds: float = 2.0,
     settle_timeout: float = 30.0,
     login_wait_timeout: float = 600.0,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[CdpResult, dict[str, Any]]:
     """Auto-launch Chrome (if needed), open / reuse the tab, extract content.
 
@@ -666,6 +667,12 @@ def fetch_via_cdp(
 
     if looks_like_login_redirect(settled_url) or not settled_url or settled_url == "about:blank":
         meta["login_required"] = True
+        if progress_callback:
+            progress_callback({
+                "stage": "waiting_login",
+                "message": "请在 Chrome 窗口完成登录",
+                "percent": 15,
+            })
         settled_url = wait_for_login_completion(
             target_id, port=port, timeout=login_wait_timeout,
         )

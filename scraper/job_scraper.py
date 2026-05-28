@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from . import cdp_scraper as cdp
 
@@ -65,6 +65,7 @@ def fetch_job_page(
     settle_seconds: float = 2.0,
     settle_timeout: float = 30.0,
     login_wait_timeout: float = 600.0,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> JobPageContent:
     """Scrape ``url`` through CDP, auto-launching Chrome if needed."""
     fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -79,6 +80,7 @@ def fetch_job_page(
             settle_seconds=settle_seconds,
             settle_timeout=settle_timeout,
             login_wait_timeout=login_wait_timeout,
+            progress_callback=progress_callback,
         )
     except cdp.CdpError as exc:
         raise ScraperError(str(exc)) from exc
