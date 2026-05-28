@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { ApiService } from '../../../core/services/api.service';
+import { FavoriteJobsService } from '../../../core/services/favorite-jobs.service';
 import type { JobAnalysis, JobMetaItem } from '../../../core/models/job.model';
 
 /**
@@ -19,6 +20,7 @@ import type { JobAnalysis, JobMetaItem } from '../../../core/models/job.model';
 })
 export class JobCardComponent {
   private api = inject(ApiService);
+  private favorites = inject(FavoriteJobsService);
   private destroyRef = inject(DestroyRef);
 
   readonly job = input.required<JobAnalysis>();
@@ -43,6 +45,7 @@ export class JobCardComponent {
   readonly companyName = computed(() => this.companyNameValue());
 
   readonly matchBadgeClass = computed(() => 'badge ' + this.job().miniTag.cls);
+  readonly isFavorite = computed(() => this.favorites.favoriteIds().has(this.job().id));
 
   /** 内联 SVG path 字典，与 index.html metaIcon() 一一对应 */
   private static readonly ICON_PATHS: Record<JobMetaItem['ico'], string> = {
@@ -60,5 +63,9 @@ export class JobCardComponent {
 
   onOpenCompany(): void {
     this.openCompany.emit();
+  }
+
+  toggleFavorite(): void {
+    this.favorites.toggle(this.job().id);
   }
 }

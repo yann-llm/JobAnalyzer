@@ -1,0 +1,262 @@
+:host { display: block; }
+
+.dialog {
+  width: min(560px, calc(100vw - 32px));
+  padding: 24px;
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.percent {
+  color: var(--brand-dark);
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.task-label {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.task-id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.progress-bar {
+  height: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  border-radius: 99px;
+  background: var(--surface-3);
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand), var(--brand-deep));
+  transition: width 0.35s ease;
+}
+
+.current {
+  min-height: 58px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(113, 50, 245, 0.14);
+  border-radius: 10px;
+  background: var(--brand-soft);
+}
+
+.current-login {
+  border-color: rgba(217, 119, 87, 0.28);
+  background: var(--orange-bg);
+}
+
+.current-main {
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.current-detail {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stages {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+
+.stage {
+  min-width: 0;
+  padding: 8px 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-2);
+  text-align: center;
+}
+
+.stage-dot {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 5px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--muted-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.stage-label {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.stage-active {
+  border-color: rgba(113, 50, 245, 0.22);
+  background: var(--brand-soft);
+
+  .stage-dot {
+    color: #fff;
+    background: var(--brand);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  .stage-label {
+    color: var(--brand-dark);
+    font-weight: 700;
+  }
+}
+
+.stage-done {
+  .stage-dot {
+    color: #fff;
+    background: var(--green);
+  }
+}
+
+.stage-error {
+  border-color: rgba(210, 63, 63, 0.28);
+  background: var(--red-bg);
+
+  .stage-dot {
+    color: #fff;
+    background: var(--red);
+  }
+}
+
+.event-log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 120px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.event-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  min-width: 0;
+  color: var(--fg-2);
+  font-size: 12px;
+}
+
+.event-stage {
+  overflow: hidden;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.error-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(210, 63, 63, 0.3);
+  border-radius: 10px;
+  background: var(--red-bg);
+  color: var(--red-text);
+  font-size: 13px;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.ghost-button {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg-2);
+  font-weight: 600;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@media (max-width: 720px) {
+  .dialog {
+    padding: 20px;
+  }
+
+  .stages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .event-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

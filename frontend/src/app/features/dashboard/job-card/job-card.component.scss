@@ -96,6 +96,15 @@
   &:hover { background: rgba(148, 151, 169, 0.16); }
 }
 
+.btn-favorite-active {
+  background: var(--brand-subtle);
+  color: var(--brand-dark);
+
+  &:hover {
+    background: rgba(133, 91, 251, 0.22);
+  }
+}
+
 .job-meta {
   display: flex;
   gap: 10px 18px;

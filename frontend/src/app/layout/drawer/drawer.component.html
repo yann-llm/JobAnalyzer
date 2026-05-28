@@ -7,13 +7,33 @@
     <div class="brand-sub">职位分析 · 智能评分</div>
   </div>
 
-  <div class="drawer-section">
-    <span>分析历史</span>
-    <span class="count">{{ count() }}</span>
+  <div class="drawer-tabs" role="tablist" aria-label="职位列表筛选">
+    <button
+      class="drawer-tab"
+      type="button"
+      role="tab"
+      [class.active]="activeTab() === 'history'"
+      [attr.aria-selected]="activeTab() === 'history'"
+      (click)="selectTab('history')"
+    >
+      <span>分析历史</span>
+      <span class="count">{{ jobs().length }}</span>
+    </button>
+    <button
+      class="drawer-tab"
+      type="button"
+      role="tab"
+      [class.active]="activeTab() === 'favorites'"
+      [attr.aria-selected]="activeTab() === 'favorites'"
+      (click)="selectTab('favorites')"
+    >
+      <span>收藏职位</span>
+      <span class="count">{{ favoriteCount() }}</span>
+    </button>
   </div>
 
   <div class="drawer-list">
-    @for (job of jobs(); track job.id) {
+    @for (job of visibleJobs(); track job.id) {
       <a
         class="job-item"
         [class.active]="job.id === activeId()"
@@ -31,8 +51,8 @@
         </div>
       </a>
     }
-    @if (!jobs().length) {
-      <div class="empty">还没有分析记录</div>
+    @if (!visibleJobs().length) {
+      <div class="empty">{{ emptyText() }}</div>
     }
   </div>
 

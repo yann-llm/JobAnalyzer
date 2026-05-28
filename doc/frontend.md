@@ -60,7 +60,7 @@ frontend/
 │           │   ├── score-overview/             ← 环形评分图 + 6 维卡片
 │           │   ├── analysis-tabs/              ← 综合解读 + 6 维详情 sub-tab
 │           │   └── company-modal/              ← Material Dialog 公司画像
-│           ├── submit-progress/                ← /jobs/:taskId SSE 进度页
+│           ├── submit-progress/                ← /jobs/:taskId SSE 进度页（保留的独立入口）
 │           └── candidate-profile/              ← /profile 候选人画像编辑
 ```
 
@@ -111,6 +111,7 @@ frontend/
 interface JobAnalysis {
   id: string;          // 对应 data/<slug>/ 目录名
   title: string;
+  sourceUrl?: string;  // 原始职位链接，用于重新分析
   code: string;        // 内部短码
   level: string;
   matchTag: string;    // "高度匹配" / "较匹配" / "需评估"
@@ -198,7 +199,15 @@ arcDashArray = computed(() => {
 
 ### SubmitProgress SSE
 
-`ApiService.streamProgress(taskId)` 返回 `Observable<AnalyzeProgressEvent>`，组件订阅后：
+`ApiService.streamProgress(taskId)` 返回 `Observable<AnalyzeProgressEvent>`。当前主流程是在 Dashboard 的 URL 输入提交成功后打开 `AnalyzeProgressDialogComponent` 弹窗，在弹窗中订阅 SSE：
+
+- `events` signal 追加事件
+- `currentEvent` / `percent` signal 驱动弹窗 UI
+- `waiting_login` 阶段高亮橙色提示，保持 SSE 连接等待用户在 Chrome 完成登录
+- 命中 `'done'` 事件时关闭弹窗，600ms 后跳转 `/results/:slug`
+- 命中 `'error'` 事件时展示错误并允许用户关闭弹窗
+
+`/jobs/:taskId` 的 `SubmitProgressComponent` 仍保留为独立进度页入口，行为与弹窗一致：
 
 - `events` signal 追加事件
 - `currentStage` / `percent` signal 驱动 UI
@@ -213,9 +222,11 @@ type StageStatus = 'pending' | 'active' | 'done' | 'error';
 
 `'waiting_login'` 阶段会高亮提示「请在 Chrome 窗口完成登录」。
 
-### Drawer 历史列表
+### Drawer 历史 / 收藏列表
 
 - `toSignal(ApiService.listResults())` 拉列表
+- 顶部 segmented control 在「分析历史」与「收藏职位」间切换
+- 收藏状态由 `FavoriteJobsService` 管理，持久化到 `localStorage` 的 `jobscope:favorites`
 - `activeId` 通过 `Router.url` 解析得到（避免 ActivatedRoute 在 shell 层拿不到子路由参数的问题）
 - 每项是 `<a [routerLink]="['/results', job.id]" routerLinkActive="active">`，点击切换无需手写导航
 - 底部「候选人画像 · 已配置」是另一条路由入口
@@ -315,7 +326,7 @@ npx ng build --configuration development  # 开发模式带 source map
 - **后端对接**：等 FastAPI（`web/app.py`）实装后切 `useMock: false`，必要时在 `ApiService` 加 adapter 层映射后端响应
 - **候选人画像**：「约束」「偏好」两个 panel 还是占位文案，需要补完整表单（建议 reactive form + `mat-chip-grid`）
 - **`/results` 独立列表页**（可选）：如果想要表格/筛选/搜索式的全量列表，drawer 之外再做一个
-- **导出 / 收藏 / 分享**：job-card 上三个按钮目前是占位，需要补功能（PDF 导出、本地收藏夹、URL 复制）
+- **导出格式升级**：当前「导出」会下载 Markdown 报告；后续可升级 PDF 导出
 - **空状态 + 错误状态**：网络失败、详情不存在等需要更友好的提示
 - **`dev.py`**：同时启动 FastAPI + ng serve 的本地脚本
 - **E2E 测试**：当前只有构建验证，没有 Playwright / Cypress 测试
