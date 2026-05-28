@@ -1,0 +1,43 @@
+<aside class="drawer">
+  <div class="drawer-head">
+    <div class="brand">
+      <div class="brand-mark">J</div>
+      <span>JobScope</span>
+    </div>
+    <div class="brand-sub">职位分析 · 智能评分</div>
+  </div>
+
+  <div class="drawer-section">
+    <span>分析历史</span>
+    <span class="count">{{ count() }}</span>
+  </div>
+
+  <div class="drawer-list">
+    @for (job of jobs(); track job.id) {
+      <a
+        class="job-item"
+        [class.active]="job.id === activeId()"
+        [routerLink]="['/results', job.id]"
+        routerLinkActive="active"
+      >
+        <div class="job-item-row">
+          <div class="job-item-title">{{ job.title }}</div>
+          <div class="job-item-score" [class]="scoreClass(job.total).color">{{ job.total }}</div>
+        </div>
+        <div class="job-item-meta">
+          <span>{{ job.miniLabel.split(' · ')[0] }}</span>
+          <span class="dot">·</span>
+          <span>{{ firstLocation(job) }}</span>
+        </div>
+      </a>
+    }
+    @if (!jobs().length) {
+      <div class="empty">还没有分析记录</div>
+    }
+  </div>
+
+  <a class="drawer-foot" routerLink="/profile" routerLinkActive="active">
+    <span class="dot"></span>
+    <span>候选人画像 · 已配置</span>
+  </a>
+</aside>

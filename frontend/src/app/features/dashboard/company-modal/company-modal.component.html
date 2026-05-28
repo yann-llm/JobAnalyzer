@@ -1,0 +1,85 @@
+@if (company(); as co) {
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-head-info">
+        <div class="modal-head-title-row">
+          <h3 class="modal-head-title">{{ co.name }}</h3>
+          @if (co.tags[0]) {
+            <span class="badge badge-green">{{ co.tags[0] }}</span>
+          }
+          @if (co.tags[1]) {
+            <span class="badge badge-neutral">{{ co.tags[1] }}</span>
+          }
+        </div>
+        <div class="modal-head-meta">
+          <span>{{ co.meta.size }}</span><span>·</span>
+          <span>{{ co.meta.stage }}</span><span>·</span>
+          <span>成立 {{ co.meta.founded }}</span><span>·</span>
+          <span>{{ co.meta.location }}</span>
+        </div>
+      </div>
+      <button class="modal-close" type="button" aria-label="关闭" (click)="close()">
+        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6L6 18" />
+          <path d="M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <div class="modal-section">
+        <h4 class="modal-section-h"><span class="modal-section-h-bar"></span>基础信息</h4>
+        <div class="co-info-grid">
+          @for (row of co.info; track row[0]) {
+            <div class="co-info-row">
+              <div class="co-info-key">{{ row[0] }}</div>
+              <div class="co-info-val">{{ row[1] }}</div>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <h4 class="modal-section-h"><span class="modal-section-h-bar"></span>公司多维评分</h4>
+        <div class="co-score-grid">
+          @for (entry of scoreEntries(co.scores); track entry.key) {
+            @let cls = scoreClass(entry.val);
+            <div class="co-score-cell">
+              <div class="co-score-cell-label">{{ entry.key }}</div>
+              <div class="co-score-cell-val" [class]="cls.color">{{ entry.val }}</div>
+              <div class="co-score-cell-bar">
+                <div class="co-score-cell-bar-fill" [class]="cls.bar" [style.width.%]="entry.val"></div>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <h4 class="modal-section-h"><span class="modal-section-h-bar"></span>公司简介</h4>
+        <p class="summary-p">{{ co.desc }}</p>
+      </div>
+
+      <div class="modal-section">
+        <h4 class="modal-section-h"><span class="modal-section-h-bar"></span>所属行业评价</h4>
+        <div class="industry-card">
+          <div class="industry-head">
+            <span class="industry-name">{{ co.industry.name }}</span>
+            <span class="industry-score">{{ co.industry.score }} / 100</span>
+          </div>
+          <p class="industry-p">{{ co.industry.desc }}</p>
+          <div class="industry-metrics">
+            @for (m of co.industry.metrics; track m.label) {
+              <div class="industry-metric">
+                <div class="industry-metric-val">{{ m.val }}</div>
+                <div class="industry-metric-label">{{ m.label }}</div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+} @else {
+  <div class="loading">加载中…</div>
+}

@@ -1,0 +1,40 @@
+<svg [attr.viewBox]="'0 0 ' + viewBoxW() + ' ' + viewBoxH()" class="radar-svg">
+  @for (ring of rings(); track $index) {
+    <polygon
+      [attr.points]="ring.points"
+      [attr.fill]="ring.filled ? 'rgba(245,245,247,0.5)' : 'none'"
+      stroke="#dedee5"
+      stroke-width="1"
+    />
+  }
+
+  @for (spoke of spokes(); track $index) {
+    <line [attr.x1]="cx()" [attr.y1]="cy()" [attr.x2]="spoke.x2" [attr.y2]="spoke.y2" stroke="#dedee5" stroke-width="1" />
+  }
+
+  @if (showLabels()) {
+    @for (label of labels(); track $index) {
+      <text
+        [attr.x]="label.x"
+        [attr.y]="label.y"
+        [attr.text-anchor]="label.anchor"
+        fill="#686b82"
+        style="font-size: 11px; font-family: var(--font-body)"
+      >
+        {{ label.text }}
+      </text>
+    }
+  }
+
+  <polygon
+    [attr.points]="dataPolygonPoints()"
+    fill="rgba(113, 50, 245, 0.16)"
+    stroke="#7132f5"
+    stroke-width="2"
+    stroke-linejoin="round"
+  />
+
+  @for (point of dataPoints(); track $index) {
+    <circle [attr.cx]="point.x.toFixed(2)" [attr.cy]="point.y.toFixed(2)" r="3" fill="#7132f5" stroke="white" stroke-width="1.5" />
+  }
+</svg>

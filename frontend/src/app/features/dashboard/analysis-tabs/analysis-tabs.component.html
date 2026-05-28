@@ -1,0 +1,153 @@
+<section class="analysis">
+  <div class="tabs-sub">
+    <button class="tab-sub" type="button" [class.active]="active() === 'summary'" (click)="setActive('summary')">
+      综合解读
+    </button>
+    @for (d of dimensions; track d.id) {
+      @let s = job().scores[d.id];
+      <button class="tab-sub" type="button" [class.active]="active() === d.id" (click)="setActive(d.id)">
+        {{ d.name }}<span class="tab-sub-num" [class]="scoreClass(s).color">{{ s }}</span>
+      </button>
+    }
+  </div>
+
+  @if (active() === 'summary') {
+    <div class="panel summary-grid">
+      <div>
+        <div class="summary-meta-grid">
+          <div class="summary-meta-row">
+            <div class="summary-meta-key">职位类型</div>
+            <div class="summary-meta-val">{{ job().summaryMeta.type }}</div>
+          </div>
+          <div class="summary-meta-row">
+            <div class="summary-meta-key">所属行业</div>
+            <div class="summary-meta-val">{{ job().summaryMeta.industry }}</div>
+          </div>
+          <div class="summary-meta-row">
+            <div class="summary-meta-key">学历要求</div>
+            <div class="summary-meta-val">{{ job().summaryMeta.edu }}</div>
+          </div>
+          <div class="summary-meta-row">
+            <div class="summary-meta-key">经验要求</div>
+            <div class="summary-meta-val">{{ job().summaryMeta.exp }}</div>
+          </div>
+          <div class="summary-meta-row">
+            <div class="summary-meta-key">招聘人数</div>
+            <div class="summary-meta-val">{{ job().summaryMeta.headcount }}</div>
+          </div>
+          <div class="summary-meta-row">
+            <div class="summary-meta-key">发布时间</div>
+            <div class="summary-meta-val">{{ job().summaryMeta.posted }}</div>
+          </div>
+        </div>
+
+        <div class="summary-section">
+          <h3 class="summary-h"><span class="summary-h-bar"></span>分析综述</h3>
+          @for (text of job().summary; track $index) {
+            <p class="summary-p">{{ text }}</p>
+          }
+        </div>
+
+        <div class="summary-section">
+          <h3 class="summary-h"><span class="summary-h-bar"></span>优劣势对比</h3>
+          <div class="pros-cons">
+            <div class="pros-cons-block pros">
+              <div class="pros-cons-block-h">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M7 17l5-5 5 5" />
+                  <path d="M7 12l5-5 5 5" />
+                </svg>
+                优势
+              </div>
+              <ul class="summary-list pros">
+                @for (p of job().pros; track $index) { <li>{{ p }}</li> }
+              </ul>
+            </div>
+            <div class="pros-cons-block cons">
+              <div class="pros-cons-block-h">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 7l-5 5-5-5" />
+                  <path d="M17 12l-5 5-5-5" />
+                </svg>
+                需关注
+              </div>
+              <ul class="summary-list cons">
+                @for (c of job().cons; track $index) { <li>{{ c }}</li> }
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="radar-card">
+        <div class="radar-card-h">六维评分雷达</div>
+        <jb-radar-chart [scores]="job().scores" />
+        <div class="radar-legend">
+          @for (item of radarLegend(); track item.name) {
+            <div class="radar-legend-item">
+              <span class="radar-legend-name">{{ item.name }}</span>
+              <span class="radar-legend-val" [class]="item.cls.color">{{ item.score }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  } @else {
+    @let dimId = active();
+    @if (dimId !== 'summary') {
+      @let detail = job().details[dimId];
+      @let dimMeta = dimensions[+(dimId.charAt(1))];
+      @let score = job().scores[dimId];
+      @let cls = scoreClass(score);
+      @let tagStyle = scoreCssVar(score);
+      <div class="panel">
+        <div class="detail-head">
+          <div class="detail-title-row">
+            <h3 class="detail-title">{{ dimMeta.name }} · {{ detail.title }}</h3>
+            <span class="detail-grade-tag" [style.background]="tagStyle.bg" [style.color]="tagStyle.fg">{{ cls.grade }}</span>
+          </div>
+          <div class="detail-score" [class]="cls.color">
+            {{ score }}<span class="detail-score-out"> / 100</span>
+          </div>
+        </div>
+
+        <div class="detail-bar-row">
+          <span>0</span>
+          <div class="detail-bar-track">
+            <div class="detail-bar-fill" [class]="cls.bar" [style.width.%]="score"></div>
+          </div>
+          <span>100</span>
+        </div>
+
+        <div class="detail-body">
+          <div class="detail-desc-card">
+            <h4>分析说明</h4>
+            <p>{{ detail.text }}</p>
+            <div class="detail-kpi-grid">
+              @for (k of detail.kpis; track $index) {
+                <div class="kpi-card">
+                  <div class="kpi-card-val">{{ k.val }}</div>
+                  <div class="kpi-card-label">{{ k.label }}</div>
+                  <div class="kpi-card-sub">{{ k.sub }}</div>
+                </div>
+              }
+            </div>
+          </div>
+          <div class="detail-criteria-card">
+            <h4>评估细项</h4>
+            @for (k of detail.kpis; track $index) {
+              @let bar = criteriaBar(k.label, score);
+              <div class="criteria-item">
+                <span class="criteria-item-label">{{ k.label }}</span>
+                <div class="criteria-item-bar">
+                  <div class="criteria-item-bar-fill" [style.width.%]="bar.v" [style.background]="bar.color"></div>
+                </div>
+                <span class="criteria-item-score">{{ bar.v }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  }
+</section>
