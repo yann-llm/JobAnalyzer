@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, signal } from '@an
 import { CommonModule } from '@angular/common';
 
 import { DIMENSIONS } from '../../../core/models/job.model';
-import type { DimensionId, JobAnalysis } from '../../../core/models/job.model';
+import type { DimensionId, DimensionMeta, JobAnalysis } from '../../../core/models/job.model';
 import { scoreClass, scoreCssVar } from '../../../shared/score-utils';
 import { RadarChartComponent } from '../../../shared/radar-chart/radar-chart.component';
 
@@ -30,6 +30,11 @@ export class AnalysisTabsComponent {
 
   setActive(tab: TabKey): void {
     this.active.set(tab);
+  }
+
+  /** 按 id 查找维度元信息（模板里取 name / short 用） */
+  dimensionById(id: DimensionId): DimensionMeta {
+    return DIMENSIONS.find((d) => d.id === id)!;
   }
 
   /** 评估细项（criteria）—— 算法搬自 index.html，把 KPI label 投射成 0-100 条形 */

@@ -42,10 +42,10 @@
       <div class="modal-section">
         <h4 class="modal-section-h"><span class="modal-section-h-bar"></span>公司多维评分</h4>
         <div class="co-score-grid">
-          @for (entry of scoreEntries(co.scores); track entry.key) {
+          @for (entry of scoreEntries(co.scores); track entry.name) {
             @let cls = scoreClass(entry.val);
             <div class="co-score-cell">
-              <div class="co-score-cell-label">{{ entry.key }}</div>
+              <div class="co-score-cell-label">{{ entry.name }}</div>
               <div class="co-score-cell-val" [class]="cls.color">{{ entry.val }}</div>
               <div class="co-score-cell-bar">
                 <div class="co-score-cell-bar-fill" [class]="cls.bar" [style.width.%]="entry.val"></div>

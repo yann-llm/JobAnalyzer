@@ -96,7 +96,7 @@
     @let dimId = active();
     @if (dimId !== 'summary') {
       @let detail = job().details[dimId];
-      @let dimMeta = dimensions[+(dimId.charAt(1))];
+      @let dimMeta = dimensionById(dimId);
       @let score = job().scores[dimId];
       @let cls = scoreClass(score);
       @let tagStyle = scoreCssVar(score);

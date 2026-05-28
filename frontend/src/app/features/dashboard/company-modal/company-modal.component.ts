@@ -5,7 +5,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 
 import { ApiService } from '../../../core/services/api.service';
 import { scoreClass } from '../../../shared/score-utils';
-import type { CompanyScores } from '../../../core/models/job.model';
+import { COMPANY_SCORE_DIMENSIONS } from '../../../core/models/job.model';
+import type { CompanyScoreId, CompanyScores } from '../../../core/models/job.model';
 
 interface CompanyModalData {
   companyId: string;
@@ -32,9 +33,14 @@ export class CompanyModalComponent {
 
   scoreClass = scoreClass;
 
-  /** 把 scores object 转成 entries 数组，模板里 @for 用 */
-  scoreEntries(scores: CompanyScores): { key: string; val: number }[] {
-    return Object.entries(scores).map(([key, val]) => ({ key, val }));
+  /**
+   * 把 scores 转成 [中文名, 分数] 顺序数组。
+   * 顺序按 COMPANY_SCORE_DIMENSIONS（前端固定语序），key 缺失时跳过。
+   */
+  scoreEntries(scores: CompanyScores): { name: string; val: number }[] {
+    return COMPANY_SCORE_DIMENSIONS
+      .filter((d) => typeof scores[d.id] === 'number')
+      .map((d) => ({ name: d.name, val: scores[d.id] }));
   }
 
   close(): void {
