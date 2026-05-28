@@ -135,6 +135,123 @@ def final_page_content(cleaned: dict[str, Any]) -> dict[str, Any]:
     return {field: page_content.get(field) for field in fields}
 
 
+def load_company_cleaned(base_dir: Path) -> dict[str, Any] | None:
+    """Resolve `company.json` to the cleaned company data (with industry_data merged in).
+
+    Returns None when there's no company reference or the cache file is missing.
+    """
+    ref_path = base_dir / "company.json"
+    if not ref_path.exists():
+        return None
+    try:
+        ref = json.loads(ref_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if ref.get("status") != "ok":
+        return None
+    cache_rel = ref.get("cache_path")
+    if not cache_rel:
+        return None
+    cache_path = DATA_DIR / cache_rel
+    if not cache_path.exists():
+        print(f"[分析] 公司缓存缺失: {cache_path}")
+        return None
+    try:
+        cache_payload = json.loads(cache_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    block = cache_payload.get("qcc_block") or {}
+    cleaned = dict(block.get("cleaned") or {})
+    industry_data = block.get("industry_data")
+    if industry_data:
+        cleaned["industry_data"] = industry_data
+    return cleaned or None
+
+
+def load_candidate_profile() -> dict[str, Any] | None:
+    """Load candidate profile from project root, returning None when missing/invalid."""
+    profile_path = PROJECT_DIR / "candidate_profile.json"
+    if not profile_path.exists():
+        return None
+    try:
+        data = json.loads(profile_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        print(f"[分析] candidate_profile.json 解析失败: {exc}")
+        return None
+    if not isinstance(data, dict):
+        return None
+    # Skip the example/schema-comment file gracefully.
+    return data
+
+
+def run_analyzers(
+    url: str,
+    base_dir: Path,
+    job_cleaned: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Run all 4 analyzers (job_value/company_risk/industry_outlook/final) and persist.
+
+    Returns the analysis bundle, or None when analyzers cannot be imported / run.
+    Failures in individual analyzers are recorded in-place and don't abort the run.
+    """
+    try:
+        from analyzers import ANALYZER_REGISTRY, run_analyzer
+        from analyzers.final_evaluation_agent import analyze_final_evaluation
+    except ImportError as exc:
+        print(f"[分析] 分析器模块加载失败，跳过: {exc}")
+        return None
+
+    company_cleaned = load_company_cleaned(base_dir)
+    candidate_profile = load_candidate_profile()
+
+    print(
+        f"[分析] 启动 LLM 分析（公司数据: "
+        f"{'有' if company_cleaned else '无'}, 候选人画像: "
+        f"{'有' if candidate_profile else '无'}）"
+    )
+
+    # Sub-module analyses run sequentially; each one calls chat_json once.
+    module_analyses: dict[str, Any] = {}
+    for name, analyzer_fn in ANALYZER_REGISTRY.items():
+        print(f"  [分析] 运行 {name}...")
+        try:
+            module_analyses[name] = run_analyzer(
+                analyzer_fn,
+                job_cleaned,
+                qcc_cleaned=company_cleaned,
+                candidate_profile=candidate_profile,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"  [分析] {name} 失败: {type(exc).__name__}: {exc}")
+            module_analyses[name] = {
+                "module": name,
+                "status": "error",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+
+    # Final evaluation aggregates the sub-module analyses.
+    print("  [分析] 运行 final_evaluation...")
+    try:
+        final = analyze_final_evaluation(url, module_analyses, candidate_profile)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [分析] final_evaluation 失败: {type(exc).__name__}: {exc}")
+        final = {
+            "module": "final_evaluation",
+            "status": "error",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+    bundle = {
+        "url": url,
+        "generated_at": isoformat(now_utc()),
+        "candidate_profile_used": bool(candidate_profile),
+        "modules": module_analyses,
+        "final": final,
+    }
+    write_json(base_dir / "analysis.json", bundle)
+    return bundle
+
+
 def enrich_business_info_from_company_page(
     cleaned: dict[str, Any],
     *,
@@ -196,6 +313,7 @@ def analyze_url(
     keep_screenshot: bool = True,
     prefer_existing_tab: bool = True,
     login_wait_timeout: int = 600,
+    run_analysis: bool = True,
 ) -> dict[str, Any]:
     """Run scrape -> clean -> external company enrichment and persist artifacts."""
     generated_at = now_utc()
@@ -295,11 +413,16 @@ def analyze_url(
 
     qcc = qcc or {}
 
+    analysis_bundle = None
+    if run_analysis:
+        job_cleaned = final_page_content(cleaned)
+        analysis_bundle = run_analyzers(url, base_dir, job_cleaned)
+
     summary = {
         "url": url,
         "generated_at": isoformat(generated_at),
         "output_dir": str(base_dir),
-        "stage": "scrape_and_company_enrich",
+        "stage": "scrape_company_enrich_analysis" if analysis_bundle else "scrape_and_company_enrich",
         "status": "success",
         "final_url": page.final_url,
         "body_chars": body_len,
@@ -309,10 +432,15 @@ def analyze_url(
             "anchor": qcc.get("anchor"),
             "error": qcc.get("error"),
         },
+        "analysis": {
+            "status": "ok" if analysis_bundle else "skipped",
+            "candidate_profile_used": bool(analysis_bundle and analysis_bundle.get("candidate_profile_used")),
+        },
     }
     return {
         "summary": summary,
         "cleaned": cleaned,
+        "analysis": analysis_bundle,
     }
 
 
@@ -342,6 +470,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=600,
         help="Max seconds to wait for the user to finish login on first run (default: 600).",
     )
+    parser.add_argument(
+        "--no-analysis",
+        action="store_true",
+        help="Skip the LLM analysis stage (only scrape + QCC enrich).",
+    )
     return parser.parse_args(argv)
 
 
@@ -355,6 +488,7 @@ def main(argv: list[str] | None = None) -> int:
         keep_screenshot=args.screenshot,
         prefer_existing_tab=not args.no_existing_tab,
         login_wait_timeout=args.login_wait,
+        run_analysis=not args.no_analysis,
     )
 
     print("\n=== 抓取与公司信息请求完成 ===")
@@ -370,6 +504,20 @@ def main(argv: list[str] | None = None) -> int:
     print(f"公司信息请求: {company.get('status')}")
     if company.get("search_key"):
         print(f"查询 key: {company['search_key']}")
+
+    analysis = result.get("analysis")
+    if analysis:
+        final = analysis.get("final") or {}
+        final_analysis = final.get("analysis") or {}
+        score = (final_analysis.get("综合评分") or {}).get("分数") if isinstance(final_analysis.get("综合评分"), dict) else None
+        action = final_analysis.get("建议动作")
+        print(
+            f"分析完成: {len(analysis.get('modules') or {})} 个子模块"
+            + (f" · 综合评分 {score}" if score is not None else "")
+            + (f" · 建议 {action}" if action else "")
+        )
+    elif summary.get("analysis", {}).get("status") == "skipped":
+        print("分析已跳过（--no-analysis）")
     return 0
 
 

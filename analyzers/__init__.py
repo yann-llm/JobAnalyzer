@@ -1,5 +1,7 @@
 """LLM sub-agent analyzers for job-posting analysis."""
 
+from __future__ import annotations
+
 from inspect import signature
 from typing import Any, Callable
 

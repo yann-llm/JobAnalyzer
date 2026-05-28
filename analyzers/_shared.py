@@ -146,7 +146,7 @@ def _select_qcc_company_info(qcc_cleaned: dict[str, Any], scope: str) -> dict[st
         "registration_info": _select_registration_info(registration, scope),
     }
     if scope == "company_risk":
-        for key in ("shareholdinfo", "controller", "investments", "risk"):
+        for key in ("shareholdinfo", "controller", "investments", "risk", "operation"):
             value = qcc_cleaned.get(key)
             if value:
                 company[key] = value
