@@ -14,6 +14,7 @@
 | GET    | `/api/results/{id}`                        | 单个职位分析详情                    |
 | GET    | `/api/companies/{companyId}`               | 公司画像（modal）                   |
 | POST   | `/api/analyze`                             | 提交一个新的分析任务                |
+| POST   | `/api/results/{id}/reanalyze`              | 对已有结果重新运行分析              |
 | GET    | `/api/analyze/{taskId}/stream` (SSE)       | 订阅任务进度                        |
 | GET    | `/api/candidate-profile` ⚠️                  | 读取候选人画像（**前端尚未接入**）   |
 | PUT    | `/api/candidate-profile` ⚠️                  | 写入候选人画像（**前端尚未接入**）   |
@@ -264,6 +265,45 @@ Content-Type: application/json
 ```
 
 `taskId` 是后续 SSE 端点的入参；前端拿到后立刻跳 `/jobs/:taskId` 订阅进度流。前端期望本端点**立即返回**（不等任务完成）。
+
+---
+
+### 3.4.1 `POST /api/results/{id}/reanalyze`
+
+```http
+POST /api/results/www.zhipin.com_job_detail_xxx.html/reanalyze
+Content-Type: application/json
+
+{}
+```
+
+**用途**：前端在详情页点击「重新分析」时调用。后端会基于该历史结果 `analysis.json.url` 重新跑完整流程，并返回新的 `taskId`，后续仍然通过 `GET /api/analyze/{taskId}/stream` 订阅进度。
+
+**Response 202**：
+
+```json
+{ "taskId": "a1b2c3d4-..." }
+```
+
+**Response 404**：`{ "detail": "not found" }`，表示 `id` 对应的历史结果不存在，或历史结果里找不到原始 URL。
+
+可选请求体：
+
+```json
+{ "url": "https://www.zhipin.com/job_detail/xxx.html" }
+```
+
+如果传入 `url`，后端以请求体 URL 为准；否则读取 `data/{id}/analysis.json` 里的 `url`。
+
+**重新分析语义**
+
+- 必须走完整抓取 → 页面清洗 → 公司数据整合 → 4 个 LLM analyzer → adapter 输出流程。
+- 不复用 `data/{id}/analysis.json`、`job_cleaned.json`、`company.json` 等旧分析产物；同 slug 目录下旧产物会被本次结果覆盖。
+- QCC / 公司信息仍保留缓存策略：如果 `data/_company_cache/{USCC}.json` 未过期且可读，后端直接复用公司缓存；只有缓存过期、缺失、解析失败或没有命中唯一公司时，才重新获取公司数据。
+- 重新分析的核心目标是基于最新抓取内容和现有公司数据重新运行 LLM，因此会重新生成 `analysis.json`。
+- 完成时 SSE `done.slug` 仍是可直接用于 `GET /api/results/{slug}` 的结果 id。若 URL 未变化，通常会覆盖同一个 slug。
+
+前端对接建议：重新分析按钮调用本接口拿到 `taskId` 后，直接跳转到现有进度页 `/jobs/:taskId`，不需要新增一套进度展示逻辑。
 
 ---
 

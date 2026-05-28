@@ -124,6 +124,18 @@ def cleanup_known_artifacts(base_dir: Path) -> None:
             shutil.rmtree(target)
 
 
+def cleanup_result_artifacts(base_dir: Path) -> None:
+    """Remove current result artifacts before refreshing LLM analysis."""
+    base = base_dir.resolve()
+    data_root = DATA_DIR.resolve()
+    if not (base == data_root or data_root in base.parents):
+        raise ValueError(f"Refusing to clean outside data dir: {base}")
+    for name in ("analysis.json", "job_cleaned.json", "company.json", "raw_page.html"):
+        target = base_dir / name
+        if target.exists():
+            target.unlink()
+
+
 def business_info_to_chinese(info: dict[str, Any]) -> dict[str, Any]:
     mapping = {
         "company_name": "公司名称",
@@ -416,6 +428,7 @@ def analyze_url(
     login_wait_timeout: int = 600,
     run_analysis: bool = True,
     progress_callback: ProgressCallback | None = None,
+    refresh_analysis: bool = False,
 ) -> dict[str, Any]:
     """Run scrape -> clean -> external company enrichment and persist artifacts."""
     generated_at = now_utc()
@@ -423,6 +436,8 @@ def analyze_url(
     base_dir.mkdir(parents=True, exist_ok=True)
     profile_path = Path(profile_dir) if profile_dir else default_profile_dir()
     cleanup_known_artifacts(base_dir)
+    if refresh_analysis:
+        cleanup_result_artifacts(base_dir)
 
     print(f"[抓取] {url}")
     print(f"[抓取] Chrome profile: {profile_path}  port: {port}")

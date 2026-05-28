@@ -33,6 +33,10 @@ class AnalyzeRequest(BaseModel):
     url: str
 
 
+class ReanalyzeRequest(BaseModel):
+    url: str | None = None
+
+
 @app.get("/api/results")
 def list_results() -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
@@ -62,18 +66,19 @@ def get_company(company_id: str) -> dict[str, Any]:
 
 @app.post("/api/analyze", status_code=status.HTTP_202_ACCEPTED)
 def submit_analysis(payload: AnalyzeRequest, background_tasks: BackgroundTasks) -> dict[str, str]:
-    task_id = str(uuid.uuid4())
-    TASKS[task_id] = {
-        "stage": "launching_chrome",
-        "message": "准备启动分析任务",
-        "percent": 0,
-        "url": payload.url,
-        "done": False,
-        "error": None,
-        "slug": slugify_url(payload.url),
-    }
-    background_tasks.add_task(_run_analysis_task, task_id, payload.url)
-    return {"taskId": task_id}
+    return _create_analysis_task(background_tasks, payload.url, refresh_analysis=False)
+
+
+@app.post("/api/results/{result_id:path}/reanalyze", status_code=status.HTTP_202_ACCEPTED)
+def reanalyze_result(
+    result_id: str,
+    background_tasks: BackgroundTasks,
+    payload: ReanalyzeRequest | None = None,
+) -> dict[str, str]:
+    url = (payload.url if payload else None) or _url_for_result(result_id)
+    if not url:
+        raise HTTPException(status_code=404, detail="not found")
+    return _create_analysis_task(background_tasks, url, refresh_analysis=True)
 
 
 @app.get("/api/analyze/{task_id}/stream")
@@ -127,7 +132,40 @@ def update_candidate_profile(profile: dict[str, Any]) -> dict[str, bool]:
     return {"ok": True}
 
 
-def _run_analysis_task(task_id: str, url: str) -> None:
+def _create_analysis_task(
+    background_tasks: BackgroundTasks,
+    url: str,
+    *,
+    refresh_analysis: bool,
+) -> dict[str, str]:
+    task_id = str(uuid.uuid4())
+    TASKS[task_id] = {
+        "stage": "launching_chrome",
+        "message": "准备启动分析任务",
+        "percent": 0,
+        "url": url,
+        "done": False,
+        "error": None,
+        "slug": slugify_url(url),
+        "refreshAnalysis": refresh_analysis,
+    }
+    background_tasks.add_task(_run_analysis_task, task_id, url, refresh_analysis)
+    return {"taskId": task_id}
+
+
+def _url_for_result(result_id: str) -> str | None:
+    analysis_path = DATA_DIR / result_id / "analysis.json"
+    if not analysis_path.exists():
+        return None
+    try:
+        analysis = read_json(analysis_path)
+    except (json.JSONDecodeError, OSError):
+        return None
+    url = analysis.get("url")
+    return url if isinstance(url, str) and url else None
+
+
+def _run_analysis_task(task_id: str, url: str, refresh_analysis: bool = False) -> None:
     task = TASKS[task_id]
 
     def update_progress(event: dict[str, Any]) -> None:
@@ -141,7 +179,7 @@ def _run_analysis_task(task_id: str, url: str) -> None:
             task["slug"] = event["slug"]
 
     try:
-        result = analyze_url(url, progress_callback=update_progress)
+        result = analyze_url(url, progress_callback=update_progress, refresh_analysis=refresh_analysis)
         summary = result.get("summary") or {}
         if summary.get("status") != "success":
             task.update(
