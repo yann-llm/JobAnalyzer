@@ -6,7 +6,9 @@
       <div class="section-bar-left">
         <div class="section-bar-icon">◈</div>
         <span class="section-bar-title">职位分析报告</span>
-        <span class="section-bar-time">{{ analysisTime() }}</span>
+        @if (analysisTime()) {
+          <span class="section-bar-time">{{ analysisTime() }}</span>
+        }
       </div>
       <div class="section-bar-actions">
         <button class="bar-action" type="button">↻ 重新分析</button>
@@ -15,8 +17,16 @@
     </div>
 
     <jb-job-card [job]="j" (openCompany)="openCompany(j.company)" />
-    <jb-score-overview [job]="j" />
-    <jb-analysis-tabs [job]="j" />
+    <jb-score-overview
+      [job]="j"
+      [activeDimension]="activeDimension()"
+      (selectDimension)="selectDimensionTab($event)"
+    />
+    <jb-analysis-tabs
+      [job]="j"
+      [activeTab]="activeAnalysisTab()"
+      (activeTabChange)="activeAnalysisTab.set($event)"
+    />
   } @else {
     <div class="empty">还没有分析记录，请在上方输入职位链接</div>
   }

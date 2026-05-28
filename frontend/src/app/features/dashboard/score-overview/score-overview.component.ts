@@ -1,8 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { DIMENSIONS } from '../../../core/models/job.model';
-import type { JobAnalysis } from '../../../core/models/job.model';
+import type { DimensionId, JobAnalysis } from '../../../core/models/job.model';
 import { scoreClass } from '../../../shared/score-utils';
 
 /**
@@ -19,6 +19,8 @@ import { scoreClass } from '../../../shared/score-utils';
 })
 export class ScoreOverviewComponent {
   readonly job = input.required<JobAnalysis>();
+  readonly activeDimension = input<DimensionId | null>(null);
+  readonly selectDimension = output<DimensionId>();
 
   readonly RADIUS = 86;
   readonly CIRCUMFERENCE = 2 * Math.PI * this.RADIUS;
@@ -30,4 +32,8 @@ export class ScoreOverviewComponent {
 
   readonly dimensions = DIMENSIONS;
   scoreClass = scoreClass;
+
+  onSelectDimension(id: DimensionId): void {
+    this.selectDimension.emit(id);
+  }
 }

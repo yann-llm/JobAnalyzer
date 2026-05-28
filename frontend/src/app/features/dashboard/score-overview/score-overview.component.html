@@ -24,7 +24,13 @@
     @for (d of dimensions; track d.id) {
       @let score = job().scores[d.id];
       @let cls = scoreClass(score);
-      <div class="dim-card">
+      <button
+        class="dim-card"
+        type="button"
+        [class.active]="activeDimension() === d.id"
+        [attr.aria-pressed]="activeDimension() === d.id"
+        (click)="onSelectDimension(d.id)"
+      >
         <div class="dim-card-head">
           <div class="dim-card-name">{{ d.name }}</div>
           <div class="dim-card-score" [class]="cls.color">{{ score }}</div>
@@ -33,7 +39,7 @@
           <div class="dim-card-bar-fill" [class]="cls.bar" [style.width.%]="score"></div>
         </div>
         <div class="dim-card-note">{{ cls.grade }}</div>
-      </div>
+      </button>
     }
   </div>
 </section>

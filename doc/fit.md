@@ -21,6 +21,7 @@
 - 默认端口：`http://127.0.0.1:8000`（前端的 `environment.apiBase` 已经指向这里）
 - 所有响应都用 JSON，编码 UTF-8，**不要给字段名做 camel/snake 转换**：前端类型与下面定义完全对齐
 - **所有键名一律英文 camelCase**：JSON 里**禁止出现中文 key**（如 `{ "财务稳健性": 88 }` ❌），避免序列化、URL 参数、日志检索踩坑。中文只能作为字符串**值**出现（即用户可见的 label / 文案）
+- 后端必须直接输出前端字段名，**不要指望前端 adapter 兜底**。例如分析生成时间字段必须是 `generatedAt`，不是 `generated_at`。
 - CORS：需放行 `http://127.0.0.1:4200`（Angular dev server）
 - ⚠️ 标注「前端尚未接入」的端点：前端 `ApiService` 暂时没有对应方法、`CandidateProfileComponent.save()` 目前仅 console.log。后端可以延后实现这两个端点，等前端补完调用代码后再联调；详见 §3.6 的「实施顺序提示」
 
@@ -80,6 +81,7 @@ DIMENSIONS = [
 ```ts
 interface JobAnalysis {
   id: string;            // 路径用，等同后端 slug（urlparse 后的 host_path）
+  generatedAt?: string;  // 分析生成时间，后端从内部 generated_at 转成 camelCase 后输出；建议 ISO 字符串
   title: string;         // 职位名（如 "高级前端工程师"）
   code: string;          // 短 code（如 "BYT-FE-2086"），来源可用 job 内部编号或 URL 末段
   level: string;         // 级别（"P6 / 7"），可空字符串
@@ -354,7 +356,8 @@ Content-Type: application/json
   - 职位维度 key 必须用 `responsibility` / `requirements` / `compensation` / `workload` / `companyHealth` / `industryOutlook`
   - 公司评分 key 必须用 `financialStability` / `growth` / `employeeReputation` / `promotion` / `management` / `techCulture`
   - 任何 `Record<string, X>` 类型字段，后端也得保证 key 是英文 camelCase
-- ❌ 不要给字段名做 camelCase ↔ snake_case 转换；前端是 camelCase（`taskId` / `matchTag` / `miniLabel` / `companyHealth` / `industryOutlook` / `financialStability`），后端响应直接用 camelCase
+- ❌ 不要给字段名做 camelCase ↔ snake_case 转换；前端是 camelCase（`taskId` / `matchTag` / `miniLabel` / `generatedAt` / `companyHealth` / `industryOutlook` / `financialStability`），后端响应直接用 camelCase
+  - 例如内部持久化字段可以叫 `generated_at`，但 HTTP JSON 必须返回 `generatedAt`
 - ❌ 不要破坏「`POST /api/analyze` 立即返回 + SSE 推进度」的异步模型；不要返回阻塞的同步响应
 
 ---

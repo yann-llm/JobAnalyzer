@@ -91,17 +91,31 @@
 }
 
 .dim-card {
+  appearance: none;
+  text-align: left;
+  font: inherit;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 14px 12px;
   position: relative;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
   cursor: pointer;
 
   &:hover {
     border-color: rgba(113, 50, 245, 0.3);
     background: var(--surface);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(113, 50, 245, 0.35);
+    outline-offset: 2px;
+  }
+
+  &.active {
+    border-color: rgba(113, 50, 245, 0.5);
+    background: var(--surface);
+    box-shadow: 0 0 0 3px rgba(113, 50, 245, 0.08);
   }
 }
 

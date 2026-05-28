@@ -74,12 +74,36 @@ export class ApiService {
         }
       };
       es.onerror = (err) => subscriber.error(err);
-      es.addEventListener('done', () => {
+      es.addEventListener('done', (ev) => {
+        try {
+          subscriber.next(JSON.parse((ev as MessageEvent).data) as AnalyzeProgressEvent);
+        } catch {
+          // 完成帧格式异常时仍关闭连接，避免页面卡住。
+        }
         subscriber.complete();
         es.close();
       });
       return () => es.close();
     });
+  }
+
+  /** 读取候选人画像 */
+  getCandidateProfile(): Observable<unknown | null> {
+    if (environment.useMock) {
+      return of(null).pipe(delay(80));
+    }
+    return this.http.get<unknown>(`${environment.apiBase}/api/candidate-profile`);
+  }
+
+  /** 写入候选人画像 */
+  updateCandidateProfile(profile: unknown): Observable<{ ok: boolean }> {
+    if (environment.useMock) {
+      return of({ ok: true }).pipe(delay(120));
+    }
+    return this.http.put<{ ok: boolean }>(
+      `${environment.apiBase}/api/candidate-profile`,
+      profile
+    );
   }
 
   private mockProgressStream(): Observable<AnalyzeProgressEvent> {

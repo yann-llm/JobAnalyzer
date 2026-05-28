@@ -79,6 +79,7 @@ export interface MiniTag {
 /** 单条职位分析记录 —— 一条记录对应 data/<slug>/ 一个目录 */
 export interface JobAnalysis {
   id: string;
+  generatedAt?: string;
   title: string;
   code: string;
   level: string;

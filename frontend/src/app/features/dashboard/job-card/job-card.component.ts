@@ -1,7 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, of } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { ApiService } from '../../../core/services/api.service';
 import type { JobAnalysis, JobMetaItem } from '../../../core/models/job.model';
@@ -20,22 +19,28 @@ import type { JobAnalysis, JobMetaItem } from '../../../core/models/job.model';
 })
 export class JobCardComponent {
   private api = inject(ApiService);
+  private destroyRef = inject(DestroyRef);
 
   readonly job = input.required<JobAnalysis>();
   readonly openCompany = output<void>();
+  private readonly companyNameValue = signal('');
 
   /** 关联公司用于读取名称展示 */
-  private company$ = toSignal(
-    this.api.listResults().pipe(
-      switchMap(() => {
-        const j = this.job();
-        return j ? this.api.getCompany(j.company) : of(null);
-      })
-    ),
-    { initialValue: null }
-  );
+  constructor() {
+    effect((onCleanup) => {
+      const companyId = this.job().company;
+      this.companyNameValue.set('');
+      if (!companyId) return;
 
-  readonly companyName = computed(() => this.company$()?.name ?? '');
+      const sub = this.api
+        .getCompany(companyId)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe((company) => this.companyNameValue.set(company?.name ?? ''));
+      onCleanup(() => sub.unsubscribe());
+    });
+  }
+
+  readonly companyName = computed(() => this.companyNameValue());
 
   readonly matchBadgeClass = computed(() => 'badge ' + this.job().miniTag.cls);
 

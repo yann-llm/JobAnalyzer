@@ -1,7 +1,7 @@
 :host { display: contents; }
 
 .drawer {
-  width: 260px;
+  width: var(--drawer-width, 260px);
   background: var(--surface);
   border-inline-end: 1px solid var(--border);
   display: flex;

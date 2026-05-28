@@ -1,6 +1,7 @@
 :host { display: contents; }
 
 .app {
+  --drawer-width: 260px;
   display: flex;
   min-height: 100vh;
 }

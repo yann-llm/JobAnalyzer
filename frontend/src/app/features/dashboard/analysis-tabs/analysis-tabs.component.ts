@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { DIMENSIONS } from '../../../core/models/job.model';
@@ -22,14 +22,23 @@ type TabKey = 'summary' | DimensionId;
 })
 export class AnalysisTabsComponent {
   readonly job = input.required<JobAnalysis>();
+  readonly activeTab = input<TabKey>('summary');
+  readonly activeTabChange = output<TabKey>();
   readonly active = signal<TabKey>('summary');
 
   readonly dimensions = DIMENSIONS;
   scoreClass = scoreClass;
   scoreCssVar = scoreCssVar;
 
+  constructor() {
+    effect(() => {
+      this.active.set(this.activeTab());
+    });
+  }
+
   setActive(tab: TabKey): void {
     this.active.set(tab);
+    this.activeTabChange.emit(tab);
   }
 
   /** 按 id 查找维度元信息（模板里取 name / short 用） */

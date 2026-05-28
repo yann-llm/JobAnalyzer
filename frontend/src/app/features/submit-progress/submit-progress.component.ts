@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { ApiService } from '../../core/services/api.service';
 import type { AnalyzeProgressEvent } from '../../core/models/job.model';
@@ -36,6 +37,7 @@ export class SubmitProgressComponent {
   private api = inject(ApiService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
 
   readonly taskId = signal<string>('');
   readonly events = signal<AnalyzeProgressEvent[]>([]);
@@ -74,7 +76,7 @@ export class SubmitProgressComponent {
     const id = this.route.snapshot.paramMap.get('taskId') ?? '';
     this.taskId.set(id);
     if (!id) return;
-    this.api.streamProgress(id).subscribe({
+    this.api.streamProgress(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (ev) => {
         this.events.update((prev) => [...prev, ev]);
         this.currentStage.set(ev.stage);

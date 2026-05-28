@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { ApiService } from '../../../core/services/api.service';
 import { RadarChartComponent } from '../../../shared/radar-chart/radar-chart.component';
@@ -22,6 +23,7 @@ import type { JobAnalysis } from '../../../core/models/job.model';
 export class HeroSearchComponent {
   private api = inject(ApiService);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
 
   readonly job = input.required<JobAnalysis>();
   readonly urlInput = signal<string>('');
@@ -42,7 +44,7 @@ export class HeroSearchComponent {
     const url = this.urlInput().trim();
     if (!url || this.submitting()) return;
     this.submitting.set(true);
-    this.api.submitAnalysis(url).subscribe({
+    this.api.submitAnalysis(url).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res) => {
         this.submitting.set(false);
         this.router.navigate(['/jobs', res.taskId]);

@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { filter, map, startWith } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { scoreClass } from '../../shared/score-utils';
@@ -24,13 +25,21 @@ export class DrawerComponent {
   private router = inject(Router);
 
   readonly jobs = toSignal(this.api.listResults(), { initialValue: [] as JobAnalysis[] });
+  private readonly currentUrl = toSignal(
+    this.router.events.pipe(
+      filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+      map((event) => event.urlAfterRedirects),
+      startWith(this.router.url)
+    ),
+    { initialValue: this.router.url }
+  );
   readonly count = computed(() => this.jobs().length);
 
   /** 当前选中职位 id（从 URL 解析）。空就高亮第一个。 */
   readonly activeId = computed(() => {
     const list = this.jobs();
     if (!list.length) return null;
-    const segments = this.router.url.split('/').filter(Boolean);
+    const segments = this.currentUrl().split('/').filter(Boolean);
     if (segments[0] === 'results' && segments[1]) return segments[1];
     return list[0].id;
   });

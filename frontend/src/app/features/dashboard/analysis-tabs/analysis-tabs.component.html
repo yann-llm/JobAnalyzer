@@ -96,58 +96,60 @@
     @let dimId = active();
     @if (dimId !== 'summary') {
       @let detail = job().details[dimId];
-      @let dimMeta = dimensionById(dimId);
-      @let score = job().scores[dimId];
-      @let cls = scoreClass(score);
-      @let tagStyle = scoreCssVar(score);
-      <div class="panel">
-        <div class="detail-head">
-          <div class="detail-title-row">
-            <h3 class="detail-title">{{ dimMeta.name }} · {{ detail.title }}</h3>
-            <span class="detail-grade-tag" [style.background]="tagStyle.bg" [style.color]="tagStyle.fg">{{ cls.grade }}</span>
+      @if (detail) {
+        @let dimMeta = dimensionById(dimId);
+        @let score = job().scores[dimId];
+        @let cls = scoreClass(score);
+        @let tagStyle = scoreCssVar(score);
+        <div class="panel">
+          <div class="detail-head">
+            <div class="detail-title-row">
+              <h3 class="detail-title">{{ dimMeta.name }} · {{ detail.title }}</h3>
+              <span class="detail-grade-tag" [style.background]="tagStyle.bg" [style.color]="tagStyle.fg">{{ cls.grade }}</span>
+            </div>
+            <div class="detail-score" [class]="cls.color">
+              {{ score }}<span class="detail-score-out"> / 100</span>
+            </div>
           </div>
-          <div class="detail-score" [class]="cls.color">
-            {{ score }}<span class="detail-score-out"> / 100</span>
-          </div>
-        </div>
 
-        <div class="detail-bar-row">
-          <span>0</span>
-          <div class="detail-bar-track">
-            <div class="detail-bar-fill" [class]="cls.bar" [style.width.%]="score"></div>
+          <div class="detail-bar-row">
+            <span>0</span>
+            <div class="detail-bar-track">
+              <div class="detail-bar-fill" [class]="cls.bar" [style.width.%]="score"></div>
+            </div>
+            <span>100</span>
           </div>
-          <span>100</span>
-        </div>
 
-        <div class="detail-body">
-          <div class="detail-desc-card">
-            <h4>分析说明</h4>
-            <p>{{ detail.text }}</p>
-            <div class="detail-kpi-grid">
+          <div class="detail-body">
+            <div class="detail-desc-card">
+              <h4>分析说明</h4>
+              <p>{{ detail.text }}</p>
+              <div class="detail-kpi-grid">
+                @for (k of detail.kpis; track $index) {
+                  <div class="kpi-card">
+                    <div class="kpi-card-val">{{ k.val }}</div>
+                    <div class="kpi-card-label">{{ k.label }}</div>
+                    <div class="kpi-card-sub">{{ k.sub }}</div>
+                  </div>
+                }
+              </div>
+            </div>
+            <div class="detail-criteria-card">
+              <h4>评估细项</h4>
               @for (k of detail.kpis; track $index) {
-                <div class="kpi-card">
-                  <div class="kpi-card-val">{{ k.val }}</div>
-                  <div class="kpi-card-label">{{ k.label }}</div>
-                  <div class="kpi-card-sub">{{ k.sub }}</div>
+                @let bar = criteriaBar(k.label, score);
+                <div class="criteria-item">
+                  <span class="criteria-item-label">{{ k.label }}</span>
+                  <div class="criteria-item-bar">
+                    <div class="criteria-item-bar-fill" [style.width.%]="bar.v" [style.background]="bar.color"></div>
+                  </div>
+                  <span class="criteria-item-score">{{ bar.v }}</span>
                 </div>
               }
             </div>
           </div>
-          <div class="detail-criteria-card">
-            <h4>评估细项</h4>
-            @for (k of detail.kpis; track $index) {
-              @let bar = criteriaBar(k.label, score);
-              <div class="criteria-item">
-                <span class="criteria-item-label">{{ k.label }}</span>
-                <div class="criteria-item-bar">
-                  <div class="criteria-item-bar-fill" [style.width.%]="bar.v" [style.background]="bar.color"></div>
-                </div>
-                <span class="criteria-item-score">{{ bar.v }}</span>
-              </div>
-            }
-          </div>
         </div>
-      </div>
+      }
     }
   }
 </section>
