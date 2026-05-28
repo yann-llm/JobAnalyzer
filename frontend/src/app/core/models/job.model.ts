@@ -121,8 +121,13 @@ export const COMPANY_SCORE_DIMENSIONS: readonly CompanyScoreMeta[] = [
   { id: 'techCulture',        name: '技术氛围' },
 ];
 
-/** 公司多维评分（modal 里展示） */
-export type CompanyScores = Record<CompanyScoreId, number>;
+/**
+ * 公司多维评分（modal 里展示）。
+ *
+ * 后端可以只返回 6 个 key 中的子集（如某家公司没有「员工口碑」数据就不出该 key）；
+ * 前端 modal 会按 COMPANY_SCORE_DIMENSIONS 顺序遍历、缺失即跳过。
+ */
+export type CompanyScores = Partial<Record<CompanyScoreId, number>>;
 
 export interface CompanyMeta {
   size: string;
