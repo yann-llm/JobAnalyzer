@@ -6,6 +6,7 @@ data/
 .chrome-debug-profile/
 .env
 candidate_profile.json
+.claude
 .idea/
 .vscode/
 *.log

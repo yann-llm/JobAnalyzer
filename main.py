@@ -184,6 +184,56 @@ def load_candidate_profile() -> dict[str, Any] | None:
     return data
 
 
+def inject_salary_benchmark(
+    job_value_module: dict[str, Any] | None,
+    job_cleaned: dict[str, Any],
+) -> None:
+    """Replace LLM-generated 现金月薪 KPI with Hudson 2025 benchmark lookup.
+
+    Mutates ``job_value_module["analysis"]["维度评分"]["薪酬福利"]["kpis"]`` in
+    place. Best-effort: any error logs and skips silently.
+    """
+    if not job_value_module or job_value_module.get("status") == "error":
+        return
+    try:
+        from external_data.salary_benchmark import (
+            format_kpi,
+            lookup_salary,
+            parse_posted_salary,
+        )
+
+        analysis = job_value_module.get("analysis") or {}
+        pay_dim = (analysis.get("维度评分") or {}).get("薪酬福利")
+        if not isinstance(pay_dim, dict):
+            return
+        kpis = pay_dim.get("kpis")
+        if not isinstance(kpis, list):
+            return
+
+        title = job_cleaned.get("职位名称") or ""
+        salary = job_cleaned.get("薪资") or ""
+        bench = lookup_salary(title)
+        lo, hi = parse_posted_salary(salary)
+        if lo is None and hi is None:
+            return  # No parseable salary -> keep LLM output
+
+        new_kpi = format_kpi(bench, lo, hi)
+        new_kpi["source"] = "Hudson 2025" if bench else "JD原文"
+
+        # Replace the KPI whose label looks like a salary metric.
+        for i, k in enumerate(kpis):
+            label = (k.get("label") or "") if isinstance(k, dict) else ""
+            if any(t in label for t in ("月薪", "薪资", "现金", "年包", "包")):
+                kpis[i] = new_kpi
+                print(f"  [分析] 注入薪酬基准: {new_kpi['val']} | {new_kpi['sub']}")
+                return
+        # No matching KPI found - prepend so it shows first.
+        kpis.insert(0, new_kpi)
+        print(f"  [分析] 追加薪酬基准 KPI: {new_kpi['val']} | {new_kpi['sub']}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [分析] 薪酬基准注入失败（已跳过）: {type(exc).__name__}: {exc}")
+
+
 def run_analyzers(
     url: str,
     base_dir: Path,
@@ -228,6 +278,9 @@ def run_analyzers(
                 "status": "error",
                 "error": f"{type(exc).__name__}: {exc}",
             }
+
+    # Inject Hudson salary benchmark KPI into job_value.维度评分.薪酬福利.kpis.
+    inject_salary_benchmark(module_analyses.get("job_value"), job_cleaned)
 
     # Final evaluation aggregates the sub-module analyses.
     print("  [分析] 运行 final_evaluation...")
