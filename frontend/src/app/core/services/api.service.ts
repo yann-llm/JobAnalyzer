@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, delay } from 'rxjs';
+import { BehaviorSubject, Observable, of, delay, switchMap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import type { Company, JobAnalysis, AnalyzeProgressEvent } from '../models/job.model';
@@ -18,13 +18,21 @@ import { MOCK_COMPANIES, MOCK_JOBS } from '../mock/jobs.mock';
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private http = inject(HttpClient);
+  private resultsRefresh$ = new BehaviorSubject<void>(undefined);
 
   /** 历史分析列表（drawer 用） */
   listResults(): Observable<JobAnalysis[]> {
     if (environment.useMock) {
       return of(MOCK_JOBS).pipe(delay(120));
     }
-    return this.http.get<JobAnalysis[]>(`${environment.apiBase}/api/results`);
+    return this.resultsRefresh$.pipe(
+      switchMap(() => this.http.get<JobAnalysis[]>(`${environment.apiBase}/api/results`))
+    );
+  }
+
+  /** 通知所有历史列表订阅者重新拉取结果 */
+  refreshResults(): void {
+    this.resultsRefresh$.next();
   }
 
   /** 单个分析详情 */
@@ -53,6 +61,18 @@ export class ApiService {
     return this.http.post<{ taskId: string }>(`${environment.apiBase}/api/analyze`, { url });
   }
 
+  /** 对已有结果重新运行分析 → 返回 task_id */
+  reanalyzeResult(id: string, url?: string): Observable<{ taskId: string }> {
+    if (environment.useMock) {
+      return of({ taskId: `mock-reanalyze-${Date.now()}` }).pipe(delay(200));
+    }
+    const body = url ? { url } : {};
+    return this.http.post<{ taskId: string }>(
+      `${environment.apiBase}/api/results/${id}/reanalyze`,
+      body
+    );
+  }
+
   /**
    * SSE 流：订阅任务进度。
    *
@@ -77,6 +97,7 @@ export class ApiService {
       es.addEventListener('done', (ev) => {
         try {
           subscriber.next(JSON.parse((ev as MessageEvent).data) as AnalyzeProgressEvent);
+          this.refreshResults();
         } catch {
           // 完成帧格式异常时仍关闭连接，避免页面卡住。
         }

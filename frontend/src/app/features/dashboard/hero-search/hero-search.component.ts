@@ -58,15 +58,11 @@ export class HeroSearchComponent {
     this.submitUrl(url);
   }
 
-  reanalyze(sourceUrl?: string): void {
+  reanalyze(resultId: string, sourceUrl?: string): void {
     if (sourceUrl) {
       this.urlInput.set(sourceUrl);
-      this.submitUrl(sourceUrl);
-      return;
     }
-    this.submitError.set('当前记录缺少原始职位链接，请粘贴链接后重新分析');
-    this.inputEl()?.nativeElement.focus();
-    this.inputEl()?.nativeElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    this.reanalyzeResult(resultId, sourceUrl);
   }
 
   private submitUrl(url: string): void {
@@ -81,6 +77,22 @@ export class HeroSearchComponent {
       error: (err) => {
         this.submitting.set(false);
         this.submitError.set(String(err?.message ?? err ?? '提交失败'));
+      },
+    });
+  }
+
+  private reanalyzeResult(resultId: string, sourceUrl?: string): void {
+    if (!resultId || this.submitting()) return;
+    this.submitError.set(null);
+    this.submitting.set(true);
+    this.api.reanalyzeResult(resultId, sourceUrl).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (res) => {
+        this.submitting.set(false);
+        this.openProgressDialog(res.taskId);
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.submitError.set(String(err?.message ?? err ?? '重新分析失败'));
       },
     });
   }

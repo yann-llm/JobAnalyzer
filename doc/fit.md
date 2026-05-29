@@ -24,7 +24,7 @@
 - **所有键名一律英文 camelCase**：JSON 里**禁止出现中文 key**（如 `{ "财务稳健性": 88 }` ❌），避免序列化、URL 参数、日志检索踩坑。中文只能作为字符串**值**出现（即用户可见的 label / 文案）
 - 后端必须直接输出前端字段名，**不要指望前端 adapter 兜底**。例如分析生成时间字段必须是 `generatedAt`，不是 `generated_at`。
 - CORS：需放行 `http://127.0.0.1:4200`（Angular dev server）
-- ⚠️ 标注「前端尚未接入」的端点：前端 `ApiService` 暂时没有对应方法、`CandidateProfileComponent.save()` 目前仅 console.log。后端可以延后实现这两个端点，等前端补完调用代码后再联调；详见 §3.6 的「实施顺序提示」
+- ⚠️ 标注「前端尚未接入」的端点：前端 `ApiService` 已有候选人画像读写方法，但 `CandidateProfileComponent.save()` 目前仍仅 console.log，页面尚未真正调用保存；详见 §3.6 的「实施顺序提示」
 
 ---
 
@@ -391,7 +391,7 @@ es.addEventListener('done', (ev) => {
 
 ### 3.6 候选人画像 ⚠️ 前端尚未接入
 
-> **当前状态**：前端 `frontend/src/app/core/services/api.service.ts` 还没有 `getCandidateProfile()` / `putCandidateProfile()` 方法；`CandidateProfileComponent.save()` 目前只 `console.log`。也就是说，**即便后端实现了下面两个端点，前端目前也不会调用**。
+> **当前状态**：前端 `frontend/src/app/core/services/api.service.ts` 已有 `getCandidateProfile()` / `updateCandidateProfile()` 方法；但 `CandidateProfileComponent.save()` 目前只 `console.log`，页面尚未真正调用保存。
 >
 > **实施顺序提示**：FastAPI agent 可以选择延后实现这两个端点（待前端补完 ApiService 调用后再做），或者先按下面定义实现以备前端接入。**两种顺序都可以**，但调用未接入端点不会立刻产生联调价值。
 

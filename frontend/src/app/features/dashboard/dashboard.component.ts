@@ -11,7 +11,7 @@ import { HeroSearchComponent } from './hero-search/hero-search.component';
 import { JobCardComponent } from './job-card/job-card.component';
 import { ScoreOverviewComponent } from './score-overview/score-overview.component';
 import { AnalysisTabsComponent } from './analysis-tabs/analysis-tabs.component';
-import type { DimensionId, JobAnalysis } from '../../core/models/job.model';
+import { DIMENSIONS, type DimensionId, type JobAnalysis } from '../../core/models/job.model';
 
 type AnalysisTabKey = 'summary' | DimensionId;
 
@@ -91,7 +91,7 @@ export class DashboardComponent {
   }
 
   reanalyze(job: JobAnalysis): void {
-    this.heroSearch()?.reanalyze(job.sourceUrl);
+    this.heroSearch()?.reanalyze(job.id, job.sourceUrl);
   }
 
   exportReport(job: JobAnalysis): void {
@@ -109,6 +109,7 @@ export class DashboardComponent {
   }
 
   private reportMarkdown(job: JobAnalysis): string {
+    const dimensionNames = new Map(DIMENSIONS.map((dimension) => [dimension.id, dimension.name]));
     const lines = [
       `# ${job.title}`,
       '',
@@ -129,12 +130,15 @@ export class DashboardComponent {
       ...job.cons.map((item) => `- ${item}`),
       '',
       '## 维度评分',
-      ...Object.entries(job.scores).map(([key, value]) => `- ${key}: ${value}`),
+      ...Object.entries(job.scores).map(([key, value]) => {
+        const label = dimensionNames.get(key as DimensionId) ?? key;
+        return `- ${label}: ${value}`;
+      }),
       '',
       '## 维度详情',
       ...Object.entries(job.details).flatMap(([key, detail]) => [
         '',
-        `### ${key} · ${detail.title}`,
+        `### ${dimensionNames.get(key as DimensionId) ?? key} · ${detail.title}`,
         detail.text,
         '',
         ...detail.kpis.filter((kpi) => kpi.label || kpi.val).map((kpi) => `- ${kpi.label}: ${kpi.val}${kpi.sub ? ` (${kpi.sub})` : ''}`),

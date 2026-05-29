@@ -190,7 +190,7 @@ def _dimension_details(
         "统一评分": _dict(company_risk.get("统一评分")),
         "行业评分": _dict(industry_outlook.get("行业评分")),
     }
-    return {
+    details = {
         front_key: {
             "title": _text(source[raw_key].get("title") or name),
             "text": _text(source[raw_key].get("text")),
@@ -198,6 +198,25 @@ def _dimension_details(
         }
         for front_key, name, raw_key in DIMENSION_MAP
     }
+    _normalize_requirement_completeness(details)
+    return details
+
+
+def _normalize_requirement_completeness(details: dict[str, dict[str, Any]]) -> None:
+    """Avoid showing salary-range presence as full welfare coverage."""
+    req_kpis = details.get("requirements", {}).get("kpis") or []
+    comp_kpis = details.get("compensation", {}).get("kpis") or []
+    welfare = next((k for k in comp_kpis if k.get("label") == "福利完备度"), None)
+    if not welfare or not _text(welfare.get("val")).startswith("0/5"):
+        return
+    for kpi in req_kpis:
+        if kpi.get("label") != "JD完整度":
+            continue
+        sub = _text(kpi.get("sub"))
+        if "福利覆盖度" in sub or "3/3" in sub:
+            kpi["val"] = "部分完整"
+            kpi["sub"] = "职责和要求较完整，薪资范围已给出；福利明细不足"
+        return
 
 
 def _job_meta(job: dict[str, Any], job_profile: dict[str, Any]) -> list[dict[str, Any]]:
