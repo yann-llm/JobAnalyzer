@@ -6,6 +6,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { combineLatest, map, of, shareReplay, switchMap } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
+import { AnalyzeProgressDialogComponent } from './analyze-progress-dialog/analyze-progress-dialog.component';
 import { CompanyModalComponent } from './company-modal/company-modal.component';
 import { HeroSearchComponent } from './hero-search/hero-search.component';
 import { JobCardComponent } from './job-card/job-card.component';
@@ -49,6 +50,9 @@ export class DashboardComponent {
   private routeId = toSignal(this.route.paramMap, { initialValue: null });
   private allJobs = toSignal(this.allJobs$, { initialValue: [] as JobAnalysis[] });
   readonly activeAnalysisTab = signal<AnalysisTabKey>('summary');
+  readonly emptyUrlInput = signal('');
+  readonly emptySubmitting = signal(false);
+  readonly emptySubmitError = signal<string | null>(null);
   readonly activeDimension = computed<DimensionId | null>(() => {
     const tab = this.activeAnalysisTab();
     return tab === 'summary' ? null : tab;
@@ -102,6 +106,28 @@ export class DashboardComponent {
     anchor.download = `${this.safeFileName(job.title || job.id)}-analysis.md`;
     anchor.click();
     URL.revokeObjectURL(url);
+  }
+
+  submitEmptyUrl(): void {
+    const url = this.emptyUrlInput().trim();
+    if (!url || this.emptySubmitting()) return;
+    this.emptySubmitError.set(null);
+    this.emptySubmitting.set(true);
+    this.api.submitAnalysis(url).subscribe({
+      next: (res) => {
+        this.emptySubmitting.set(false);
+        this.dialog.open(AnalyzeProgressDialogComponent, {
+          data: { taskId: res.taskId },
+          panelClass: 'jb-analyze-progress-dialog',
+          maxWidth: 'calc(100vw - 32px)',
+          width: '560px',
+        });
+      },
+      error: (err) => {
+        this.emptySubmitting.set(false);
+        this.emptySubmitError.set(String(err?.message ?? err ?? '提交失败'));
+      },
+    });
   }
 
   selectDimensionTab(id: DimensionId): void {

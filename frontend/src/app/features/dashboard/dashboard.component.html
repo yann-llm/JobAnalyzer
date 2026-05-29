@@ -28,6 +28,35 @@
       (activeTabChange)="activeAnalysisTab.set($event)"
     />
   } @else {
-    <div class="empty">还没有分析记录，请在上方输入职位链接</div>
+    <section class="empty-start">
+      <div class="empty-panel">
+        <div class="empty-icon">J</div>
+        <h1 class="empty-title">输入职位链接，开始分析</h1>
+        <p class="empty-sub">
+          粘贴 BOSS 直聘职位地址。将从职责质量、要求合理性、薪酬福利、工作强度、公司评分、行业评分六个维度评估，给出 0–100 综合得分。
+        </p>
+        <div class="empty-search-row">
+          <input
+            class="empty-search-input"
+            type="url"
+            placeholder="https://www.zhipin.com/job_detail/xxx.html"
+            [value]="emptyUrlInput()"
+            (input)="emptyUrlInput.set($any($event.target).value)"
+            (keydown.enter)="submitEmptyUrl()"
+          />
+          <button
+            class="empty-submit"
+            type="button"
+            [disabled]="emptySubmitting() || !emptyUrlInput().trim()"
+            (click)="submitEmptyUrl()"
+          >
+            {{ emptySubmitting() ? '提交中...' : '开始分析' }}
+          </button>
+        </div>
+        @if (emptySubmitError()) {
+          <div class="empty-error">{{ emptySubmitError() }}</div>
+        }
+      </div>
+    </section>
   }
 </main>
