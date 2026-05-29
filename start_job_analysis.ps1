@@ -59,7 +59,7 @@ if (-not (Test-Path $VenvPython)) {
 Write-Host "Checking backend dependencies..."
 $backendDepsOk = $true
 try {
-    & $VenvPython -c "import fastapi, uvicorn, httpx, websocket, bs4, lxml, openai, anthropic" 2>$null
+    & $VenvPython -c "import fastapi, uvicorn, httpx, websocket, bs4, lxml, openai, anthropic, dotenv" 2>$null
     if ($LASTEXITCODE -ne 0) {
         $backendDepsOk = $false
     }
@@ -95,8 +95,8 @@ if (-not (Test-Path $ngCmd)) {
     }
 }
 
-if (-not (Test-Path (Join-Path $Root "llm_config.json"))) {
-    Write-Host "[WARN] llm_config.json was not found. Analysis will fail until LLM credentials are configured." -ForegroundColor Yellow
+if (-not (Test-Path (Join-Path $Root ".env"))) {
+    Write-Host "[WARN] .env was not found. Copy .env.example to .env and fill in the LLM keys before running analysis." -ForegroundColor Yellow
 }
 
 Write-Host "Starting JobScope backend and frontend..."

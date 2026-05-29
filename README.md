@@ -27,7 +27,7 @@ job-analysis/
 │   ├── app.py                      ← FastAPI API / SSE 入口
 │   └── adapters.py                 ← analysis.json → 前端 schema 适配层
 ├── llm.py                          ← 多 provider LLM 封装
-├── llm_config.example.json
+├── .env.example
 ├── candidate_profile.example.json  ← 候选人画像模板
 ├── main.py                         ← 总入口
 ├── scraper/
@@ -66,8 +66,8 @@ python -m venv .venv
 source .venv/bin/activate        # macOS / Linux
 pip install -r requirements.txt
 
-cp llm_config.example.json llm_config.json
-# 编辑 llm_config.json 填入 provider 与 api_key
+copy .env.example .env
+# 编辑 .env，按 .env.example 填入 MODEL_NAME、OPENAI_API_KEY / ANTHROPIC_API_KEY 等配置
 ```
 
 前端依赖首次安装：
@@ -115,7 +115,7 @@ start_job_analysis.bat
 2. 检查项目虚拟环境 `.venv`；不存在时自动执行 `python -m venv .venv`。
 3. 检查 Python 运行依赖；缺失时使用 `.venv\Scripts\python.exe -m pip install -r requirements.txt` 安装到虚拟环境。
 4. 检查前端依赖；缺少 `frontend/node_modules/.bin/ng.cmd` 时自动执行 `npm install`。
-5. 若 `llm_config.json` 不存在，给出黄色提醒（不会阻止启动）。
+5. 若 `.env` 不存在，提醒用户复制 `.env.example` 并填写大模型 key（不会阻止启动）。
 6. 若 `127.0.0.1:8000` 没有服务，使用 `.venv` 里的 Python 启动 FastAPI 后端。
 7. 若 `127.0.0.1:4200` 没有服务，启动 Angular 前端。
 8. 打开浏览器访问 `http://127.0.0.1:4200`。
