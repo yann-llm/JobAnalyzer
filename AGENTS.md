@@ -16,13 +16,13 @@ project-root/
 ├── AGENTS.md                       ← 你正在读
 │
 ├── main.py                         ← 后端 CLI 总入口（抓取 + 公司整合 + LLM 分析）
+├── pipeline/                       ← 主流程拆分模块（职位抓取 / 公司页抓取 / 公司数据 / 行业 / LLM）
 ├── scraper/                        ← CDP Chrome 抓取与页面清洗
 │   ├── cdp_scraper.py
 │   ├── job_scraper.py
 │   └── cleaner.py
 ├── external_data/                  ← 企查查 MCP 数据整合
 │   ├── enrich.py
-│   ├── company_resolver.py
 │   ├── qcc_client.py
 │   ├── mcp_client.py
 │   ├── company_cache.py
@@ -58,7 +58,7 @@ project-root/
 
 | 我要做什么 | 看哪份文档 | 主要相关代码 |
 | --- | --- | --- |
-| 跑通现有 CLI / 配环境 / 了解整体流程 | [`README.md`](README.md) | `main.py` |
+| 跑通现有 CLI / 配环境 / 了解整体流程 | [`README.md`](README.md) | `main.py`, `pipeline/*` |
 | **写 FastAPI 后端 / 对接前端** | [`doc/fit.md`](doc/fit.md) | （新建）`web/app.py` |
 | **改前端 UI / 加新页面 / 加新组件** | [`doc/frontend.md`](doc/frontend.md) | `frontend/src/app/` |
 | 改抓取逻辑 / CDP 行为 | `README.md` 「为什么用 CDP」段 | `scraper/cdp_scraper.py` 等 |

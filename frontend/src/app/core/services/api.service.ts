@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, of, delay, switchMap } from 'rxjs';
+import { BehaviorSubject, Observable, of, delay, switchMap, catchError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import type { Company, JobAnalysis, AnalyzeProgressEvent } from '../models/job.model';
@@ -41,7 +41,9 @@ export class ApiService {
       const found = MOCK_JOBS.find((j) => j.id === id) ?? null;
       return of(found).pipe(delay(120));
     }
-    return this.http.get<JobAnalysis>(`${environment.apiBase}/api/results/${id}`);
+    return this.http.get<JobAnalysis>(`${environment.apiBase}/api/results/${id}`).pipe(
+      catchError(() => of(null))
+    );
   }
 
   /** 公司画像（modal 用） */
@@ -86,16 +88,28 @@ export class ApiService {
     return new Observable<AnalyzeProgressEvent>((subscriber) => {
       const url = `${environment.apiBase}/api/analyze/${taskId}/stream`;
       const es = new EventSource(url);
+      let terminalEventReceived = false;
       es.onmessage = (ev) => {
         try {
-          subscriber.next(JSON.parse(ev.data) as AnalyzeProgressEvent);
+          const event = JSON.parse(ev.data) as AnalyzeProgressEvent;
+          subscriber.next(event);
+          if (event.stage === 'error') {
+            terminalEventReceived = true;
+            this.refreshResults();
+            subscriber.complete();
+            es.close();
+          }
         } catch {
           // 忽略坏帧
         }
       };
-      es.onerror = (err) => subscriber.error(err);
+      es.onerror = () => {
+        if (terminalEventReceived || subscriber.closed) return;
+        subscriber.error(new Error('SSE 连接中断，请稍后重试'));
+      };
       es.addEventListener('done', (ev) => {
         try {
+          terminalEventReceived = true;
           subscriber.next(JSON.parse((ev as MessageEvent).data) as AnalyzeProgressEvent);
           this.refreshResults();
         } catch {

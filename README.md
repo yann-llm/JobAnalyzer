@@ -26,6 +26,7 @@ job-analysis/
 ├── web/
 │   ├── app.py                      ← FastAPI API / SSE 入口
 │   └── adapters.py                 ← analysis.json → 前端 schema 适配层
+├── pipeline/                       ← 主流程拆分：职位抓取、公司页抓取、公司数据、行业查询、LLM
 ├── llm.py                          ← 多 provider LLM 封装
 ├── .env.example
 ├── candidate_profile.example.json  ← 候选人画像模板
@@ -36,8 +37,8 @@ job-analysis/
 │   └── cleaner.py                  ← 文本清洗 + 字段抽取
 ├── external_data/
 │   ├── enrich.py                   ← 清洗后、agent 前的企查查数据整合
-│   ├── company_resolver.py         ← 从页面公司名锚定唯一企业实体
-│   └── qcc_client.py               ← qcc-company / qcc-risk MCP 调用封装
+│   ├── qcc_client.py               ← qcc-company / qcc-risk MCP 调用封装
+│   └── uscc_lookup.py              ← 页面缺失 USCC 时，用 LLM + Tavily tool 查询经营主体与信用代码
 ├── analyzers/                      ← LLM 分析模块
 │   ├── _shared.py                  ← 公共上下文构造（含候选人画像注入）
 │   ├── job_value_agent.py          ← 子 agent 1：职位综合价值（职责/要求/薪酬/强度多维评分）
@@ -70,6 +71,8 @@ copy .env.example .env
 # 编辑 .env，按 .env.example 填入 MODEL_NAME、OPENAI_API_KEY / ANTHROPIC_API_KEY 等配置
 ```
 
+若需要页面缺失 USCC 时的网络兜底查询，还需要配置 `TAVILY_API_KEY`。当前 USCC 兜底查询通过 **LLM function/tool calling + Tavily** 实现，要求使用 OpenAI-compatible provider；页面已直接抓到 USCC 的场景不依赖该兜底。
+
 前端依赖首次安装：
 
 ```bash
@@ -94,10 +97,12 @@ cp candidate_profile.example.json candidate_profile.json
 | --- | --- | --- |
 | `raw_page.html` | CDP 页面抓取 | 页面 HTML，便于排查抓取质量 |
 | `job_cleaned.json` | 页面原文 | 职位名、薪资、地点、经验、学历、描述、工商摘要等核心字段 |
-| `company.json` / `_company_cache` | 企查查 MCP（若配置） | 企业锚定、工商信息、风险信息与行业数据缓存 |
+| `company.json` / `_company_cache` | 页面 / LLM+Tavily / 企查查 MCP + 行业 Tavily 查询 | 企业锚定、工商信息、风险信息与行业数据缓存 |
 | `analysis.json` | LLM analyzers | 职位价值、公司风险、行业前景、最终评估的结构化结果 |
 
-如果没有 `qcc_config.json`，公司信息请求会跳过或只保留职位页自带的工商摘要；LLM 仍会基于已有职位信息继续分析。
+后续 LLM 分析要求先取得公司信息：流程会先从职位页 / 公司详情页抽取有效 18 位 USCC；如果页面没有 USCC，会把公司名交给大模型，并将 Tavily 作为工具提供给大模型，由模型查询经营主体全称与 USCC。取得 USCC 后才进入 QCC 查询公司工商 / 风险 / 经营数据；仍无法取得 USCC 时直接报“获取公司信息失败”，不会进入 QCC 数据整合。
+
+LLM 分析阶段中，`job_value`（职位综合价值）、`company_risk`（公司风险）、`industry_outlook`（行业前景）三个子模块并行调用；`final_evaluation` 依赖前三个结果，最后串行执行。
 
 ## 使用流程
 
@@ -116,7 +121,7 @@ start_job_analysis.bat
 3. 检查 Python 运行依赖；缺失时使用 `.venv\Scripts\python.exe -m pip install -r requirements.txt` 安装到虚拟环境。
 4. 检查前端依赖；缺少 `frontend/node_modules/.bin/ng.cmd` 时自动执行 `npm install`。
 5. 若 `.env` 不存在，提醒用户复制 `.env.example` 并填写大模型 key（不会阻止启动）。
-6. 若 `127.0.0.1:8000` 没有服务，使用 `.venv` 里的 Python 启动 FastAPI 后端。
+6. 若 `127.0.0.1:8000` 没有服务，使用 `.venv` 里的 Python 启动 FastAPI 后端（`uvicorn --reload`，Python 代码变更会自动重载）。
 7. 若 `127.0.0.1:4200` 没有服务，启动 Angular 前端。
 8. 打开浏览器访问 `http://127.0.0.1:4200`。
 
@@ -124,7 +129,7 @@ start_job_analysis.bat
 
 | 窗口 | 用途 | 关闭后果 |
 | --- | --- | --- |
-| JobScope API | FastAPI 后端 `:8000` | 前端无法请求接口 |
+| JobScope API | FastAPI 后端 `:8000`（自动 reload） | 前端无法请求接口 |
 | JobScope Frontend | Angular dev server `:4200` | 页面无法访问 |
 
 重复点击脚本时，如果端口已有服务，会直接复用，不会再启动第二个前端服务。
@@ -149,7 +154,7 @@ python main.py "https://www.zhipin.com/job_detail/xxx.html"
 1. 探测 `127.0.0.1:9222`，不在 → 用 `--remote-debugging-port=9222 --user-data-dir=.chrome-debug-profile/` 启动一个**可见的** Chrome 窗口，并直接打开目标 URL。
 2. 检测到页面被跳转到登录页 → 在终端提示「请在 Chrome 窗口完成登录」。
 3. 你登录完成后，脚本自动检测 URL 不再含 `/login`/`/web/user` 等关键字，再用 `Page.navigate` 把 tab 导回目标 URL。
-4. 抓取 title / text / html → 清洗文本 → 若配置 `qcc_config.json`，调用企查查整合公司工商 / 风险数据 → 运行 LLM 分析 → 保存到 `data/<host_path>/`。
+4. 抓取 title / text / html → 清洗文本 → 获取统一社会信用代码（页面抽取；失败时 LLM+Tavily tool 兜底）→ 调用企查查整合公司工商 / 风险数据（缓存未过期则复用）→ 并行运行前三个 LLM 子分析 → 运行最终评估 → 保存到 `data/<host_path>/`。
 
 登录态保存在 `.chrome-debug-profile/`，**仅此一次**。
 
@@ -209,7 +214,7 @@ npm start -- --host 127.0.0.1 --port 4200
 | --- | --- |
 | `/` | 主页：Hero 搜索条 + 历史中第一条职位的完整分析报告 |
 | `/results/:id` | 指定职位的分析报告（综合评分 + 6 维详情 + 雷达图） |
-| `/jobs/:taskId` | 任务进度页：SSE 推送 8 个阶段（抓取 / 登录 / QCC / 4 个 LLM 子模块 / 完成） |
+| `/jobs/:taskId` | 任务进度页：SSE 推送抓取、公司详情页、QCC、LLM 子模块与完成状态 |
 | `/profile` | 候选人画像编辑（基本信息 / 技能 / 职业目标 / 约束 / 偏好） |
 
 ### 数据切换

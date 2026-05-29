@@ -361,9 +361,11 @@ done               100% 分析完成                    slug=<resultId>
 
 - `percent` 是展示用进度，不保证严格单调；例如进入登录等待时可能从 `20` 回到 `15`，前端可以直接展示最新帧，或自行取最大值。
 - `waiting_login` 表示后端正在阻塞等待用户在本机 Chrome 完成登录/安全校验；前端应保持 SSE 连接，不要主动取消任务。
+- `scraping_company` 阶段必须取得有效的 18 位统一社会信用代码；开始抓取时 `detail = "start"`，只有获取到 USCC 后才发送 `detail = "success"`。如果公司页未抓到 USCC，后端直接发送 `error`，不会进入 `qcc_enrich`。
+- `qcc_enrich` 阶段只处理已经拿到 USCC 的公司数据查询；拿到有效 USCC 即表示企业实体已经锚定成功。
 - `analyzing` 阶段通过 `detail` 区分具体子 agent：`job_value` / `company_risk` / `industry_outlook` / `final_evaluation`。
 - `done` 必须是具名事件；前端收到后读取 `slug`，跳转到 `/results/:slug`，然后关闭 `EventSource`。
-- `error` 使用普通 message 帧（不是具名事件），字段形如 `{ "stage": "error", "message": "...", "percent": 100, "detail": "scrape_error" }`；前端收到后展示错误并关闭连接即可。
+- `error` 使用普通 message 帧（不是具名事件），字段形如 `{ "stage": "error", "message": "...", "percent": 100, "detail": "scrape_error" }`；前端收到后展示错误并关闭连接即可。若 `detail = "company_uscc_unresolved"` 或 `detail = "company_info_failed"`，表示后端未能取得/锚定公司信息，任务不会执行 QCC 分析与 LLM 分析，不会生成 `analysis.json`，也不会发送 `done`。
 
 **前端对接示例**
 

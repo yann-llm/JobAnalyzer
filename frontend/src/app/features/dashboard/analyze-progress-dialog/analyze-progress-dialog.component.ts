@@ -16,6 +16,8 @@ interface StageRow {
   label: string;
 }
 
+type StageStatus = 'pending' | 'active' | 'done' | 'error';
+
 const STAGES: StageRow[] = [
   { key: 'launching_chrome', label: '启动 Chrome' },
   { key: 'waiting_login', label: '等待登录' },
@@ -64,11 +66,15 @@ export class AnalyzeProgressDialogComponent {
 
   readonly stageState = computed(() => {
     const current = this.currentEvent()?.stage ?? null;
-    const reached = new Set<AnalyzeProgressEvent['stage']>(this.events().map((event) => event.stage));
-    return STAGES.map((stage) => ({
+    const events = this.events();
+    const reached = new Set<AnalyzeProgressEvent['stage']>(events.map((event) => event.stage));
+    const failedStage = current === 'error' ? this.failedStageFor(events) : null;
+    const stages = STAGES.map((stage) => ({
       ...stage,
-      status: this.statusOf(stage.key, current, reached),
+      status: this.statusOf(stage.key, current, reached, events, failedStage),
     }));
+    if (current !== 'error') return stages;
+    return stages.filter((stage) => reached.has(stage.key) || stage.key === failedStage);
   });
 
   constructor() {
@@ -78,6 +84,7 @@ export class AnalyzeProgressDialogComponent {
       error: (err) => {
         this.dialogRef.disableClose = false;
         this.errorMessage.set(String(err?.message ?? err ?? 'SSE 连接失败'));
+        this.api.refreshResults();
       },
     });
   }
@@ -92,11 +99,13 @@ export class AnalyzeProgressDialogComponent {
     this.events.update((prev) => [...prev, event]);
     this.currentEvent.set(event);
     if (typeof event.percent === 'number') {
-      this.percent.set(Math.max(0, Math.min(100, event.percent)));
+      const nextPercent = Math.max(0, Math.min(100, event.percent));
+      this.percent.set(event.stage === 'error' ? Math.min(nextPercent, 99) : nextPercent);
     }
     if (event.stage === 'error') {
       this.errorMessage.set(event.message);
       this.dialogRef.disableClose = false;
+      this.api.refreshResults();
       return;
     }
     if (event.stage === 'done' && event.slug) {
@@ -112,11 +121,50 @@ export class AnalyzeProgressDialogComponent {
     key: AnalyzeProgressEvent['stage'],
     current: AnalyzeProgressEvent['stage'] | null,
     reached: Set<AnalyzeProgressEvent['stage']>,
-  ): 'pending' | 'active' | 'done' | 'error' {
-    if (key === current && current === 'error') return 'error';
+    events: AnalyzeProgressEvent[],
+    failedStage: AnalyzeProgressEvent['stage'] | null,
+  ): StageStatus {
+    if (current === 'error') {
+      if (key === failedStage) return 'error';
+      if (key === 'scraping_company') return this.companyScrapeSucceeded(events) ? 'done' : 'pending';
+      if (failedStage && reached.has(key) && this.orderOf(key) < this.orderOf(failedStage)) return 'done';
+      return 'pending';
+    }
+    if (key === 'scraping_company') {
+      if (this.companyScrapeSucceeded(events)) return 'done';
+      if (current === 'scraping_company') return 'active';
+      return 'pending';
+    }
     if (current === 'done') return 'done';
     if (key === current) return 'active';
     if (reached.has(key)) return 'done';
     return 'pending';
+  }
+
+  private failedStageFor(events: AnalyzeProgressEvent[]): AnalyzeProgressEvent['stage'] | null {
+    const error = [...events].reverse().find((event) => event.stage === 'error');
+    const detail = error?.detail ?? '';
+    const message = error?.message ?? '';
+    if (this.isUsccFailure(detail, message)) return 'scraping_company';
+    if (detail === 'company_info_failed' || detail === 'company_info_error') return 'qcc_enrich';
+    if (detail === 'analysis_failed' || detail === 'analysis_missing') return 'analyzing';
+    const previous = [...events].reverse().find((event) => event.stage !== 'error');
+    return previous?.stage ?? null;
+  }
+
+  private isUsccFailure(detail: string, message: string): boolean {
+    return (
+      detail === 'company_uscc_unresolved' ||
+      message.includes('统一社会信用代码') ||
+      message.toUpperCase().includes('USCC')
+    );
+  }
+
+  private companyScrapeSucceeded(events: AnalyzeProgressEvent[]): boolean {
+    return events.some((event) => event.stage === 'scraping_company' && event.detail === 'success');
+  }
+
+  private orderOf(key: AnalyzeProgressEvent['stage']): number {
+    return STAGES.findIndex((stage) => stage.key === key);
   }
 }

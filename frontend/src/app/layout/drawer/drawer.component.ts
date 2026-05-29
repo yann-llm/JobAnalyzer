@@ -1,8 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { filter, map, startWith } from 'rxjs';
+import { filter, map, startWith, tap } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { FavoriteJobsService } from '../../core/services/favorite-jobs.service';
@@ -27,8 +27,12 @@ export class DrawerComponent {
   private api = inject(ApiService);
   private favorites = inject(FavoriteJobsService);
   private router = inject(Router);
+  private readonly jobsLoaded = signal(false);
 
-  readonly jobs = toSignal(this.api.listResults(), { initialValue: [] as JobAnalysis[] });
+  readonly jobs = toSignal(
+    this.api.listResults().pipe(tap(() => this.jobsLoaded.set(true))),
+    { initialValue: [] as JobAnalysis[] }
+  );
   readonly activeTab = signal<DrawerTab>('history');
   private readonly currentUrl = toSignal(
     this.router.events.pipe(
@@ -38,7 +42,10 @@ export class DrawerComponent {
     ),
     { initialValue: this.router.url }
   );
-  readonly favoriteCount = this.favorites.count;
+  readonly favoriteCount = computed(() => {
+    const favoriteIds = this.favorites.favoriteIds();
+    return this.jobs().filter((job) => favoriteIds.has(job.id)).length;
+  });
   readonly visibleJobs = computed(() => {
     if (this.activeTab() === 'history') return this.jobs();
     const favoriteIds = this.favorites.favoriteIds();
@@ -48,6 +55,13 @@ export class DrawerComponent {
   readonly emptyText = computed(() =>
     this.activeTab() === 'favorites' ? '还没有收藏职位' : '还没有分析记录'
   );
+
+  constructor() {
+    effect(() => {
+      if (!this.jobsLoaded()) return;
+      this.favorites.prune(this.jobs().map((job) => job.id));
+    });
+  }
 
   /** 当前选中职位 id（从 URL 解析）。空就高亮第一个。 */
   readonly activeId = computed(() => {

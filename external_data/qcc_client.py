@@ -154,9 +154,9 @@ def fetch_company_pack(
 ) -> dict[str, Any]:
     """Fetch the standard pack of company + risk + operation facts in parallel.
 
-    ``search_key`` should be a 18-digit USCC or a complete registration name
-    that ends with a whitelisted suffix. Caller is responsible for ensuring
-    that — typically by going through ``resolve_company`` first.
+    ``search_key`` should be a 18-digit USCC. Caller is responsible for
+    ensuring it was scraped from the job/company page before this function is
+    called.
     """
     company_results: dict[str, Any] = {}
     risk_results: dict[str, Any] = {}

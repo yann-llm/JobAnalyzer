@@ -12,7 +12,7 @@ import re
 from typing import Any
 from urllib.parse import urljoin
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 from .job_scraper import JobPageContent
 
@@ -353,6 +353,11 @@ def _extract_business_info_from_html(html: str, base_url: str) -> dict[str, Any]
 
     soup = BeautifulSoup(html, "lxml")
     info: dict[str, Any] = {}
+    header_company_name = _extract_company_header_name(soup)
+    if header_company_name:
+        info["company_header_name"] = header_company_name
+        info["company_name"] = header_company_name
+
     box = soup.select_one(".business-info-box") or soup.find(
         lambda tag: tag.name in {"div", "section"} and "工商信息" in tag.get_text(" ", strip=True)[:80]
     )
@@ -372,6 +377,49 @@ def _extract_business_info_from_html(html: str, base_url: str) -> dict[str, Any]
 
     text_info = _extract_business_info_from_text(soup.get_text("\n"))
     return {**text_info, **info}
+
+
+def _extract_company_header_name(soup: BeautifulSoup) -> str | None:
+    if not (
+        soup.select_one("body.company-body-wrapper")
+        or soup.select_one("#main.company-new")
+        or soup.select_one(".company-new .company-banner")
+    ):
+        return None
+
+    selectors = (
+        "#main.company-new .company-banner .company-info h1.name",
+        "#main.company-new .company-banner h1.name",
+        ".company-new .company-banner .company-info h1.name",
+        ".company-new .company-banner h1.name",
+        ".company-banner .company-info h1.name",
+        ".company-banner h1.name",
+    )
+    for selector in selectors:
+        for node in soup.select(selector):
+            name = _company_name_text_from_node(node)
+            if name:
+                return name
+    return None
+
+
+def _company_name_text_from_node(node: Any) -> str | None:
+    direct_text = " ".join(
+        str(child).strip()
+        for child in node.children
+        if isinstance(child, NavigableString) and str(child).strip()
+    )
+    if direct_text:
+        return _normalize_whitespace(direct_text).strip("：:，,；; |｜-") or None
+
+    for child in node.find_all(recursive=False):
+        classes = set(child.get("class") or [])
+        if child.name in {"a", "button"} or classes & {"btn", "op", "action", "follow", "collect"}:
+            continue
+        text = _normalize_whitespace(child.get_text(" ", strip=True)).strip("：:，,；; |｜-")
+        if text:
+            return text
+    return None
 
 
 def clean_job_page(page: JobPageContent) -> dict[str, Any]:

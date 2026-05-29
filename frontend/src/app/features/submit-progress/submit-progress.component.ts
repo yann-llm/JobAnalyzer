@@ -11,6 +11,8 @@ interface StageRow {
   label: string;
 }
 
+type StageStatus = 'pending' | 'active' | 'done' | 'error';
+
 const STAGES: StageRow[] = [
   { key: 'launching_chrome', label: '启动 Chrome 调试实例' },
   { key: 'waiting_login',    label: '等待用户登录（如触发）' },
@@ -49,23 +51,62 @@ export class SubmitProgressComponent {
 
   readonly stageState = computed(() => {
     const cur = this.currentStage();
-    const reached = new Set<AnalyzeProgressEvent['stage']>(this.events().map((e) => e.stage));
-    return STAGES.map((s) => ({
+    const events = this.events();
+    const reached = new Set<AnalyzeProgressEvent['stage']>(events.map((e) => e.stage));
+    const failedStage = cur === 'error' ? this.failedStageFor(events) : null;
+    const stages = STAGES.map((s) => ({
       ...s,
-      status: this.statusOf(s.key, cur, reached),
+      status: this.statusOf(s.key, cur, reached, events, failedStage),
     }));
+    if (cur !== 'error') return stages;
+    return stages.filter((stage) => reached.has(stage.key) || stage.key === failedStage);
   });
 
   private statusOf(
     key: AnalyzeProgressEvent['stage'],
     current: AnalyzeProgressEvent['stage'] | null,
     reached: Set<AnalyzeProgressEvent['stage']>,
-  ): 'pending' | 'active' | 'done' | 'error' {
-    if (current === 'error') return key === current ? 'error' : 'pending';
+    events: AnalyzeProgressEvent[],
+    failedStage: AnalyzeProgressEvent['stage'] | null,
+  ): StageStatus {
+    if (current === 'error') {
+      if (key === failedStage) return 'error';
+      if (key === 'scraping_company') return this.companyScrapeSucceeded(events) ? 'done' : 'pending';
+      if (failedStage && reached.has(key) && this.orderOf(key) < this.orderOf(failedStage)) return 'done';
+      return 'pending';
+    }
+    if (key === 'scraping_company') {
+      if (this.companyScrapeSucceeded(events)) return 'done';
+      if (current === 'scraping_company') return 'active';
+      return 'pending';
+    }
     if (key === current) return 'active';
     if (reached.has(key) && current && this.orderOf(key) < this.orderOf(current)) return 'done';
     if (current === 'done') return 'done';
     return 'pending';
+  }
+
+  private failedStageFor(events: AnalyzeProgressEvent[]): AnalyzeProgressEvent['stage'] | null {
+    const error = [...events].reverse().find((event) => event.stage === 'error');
+    const detail = error?.detail ?? '';
+    const message = error?.message ?? '';
+    if (this.isUsccFailure(detail, message)) return 'scraping_company';
+    if (detail === 'company_info_failed' || detail === 'company_info_error') return 'qcc_enrich';
+    if (detail === 'analysis_failed' || detail === 'analysis_missing') return 'analyzing';
+    const previous = [...events].reverse().find((event) => event.stage !== 'error');
+    return previous?.stage ?? null;
+  }
+
+  private isUsccFailure(detail: string, message: string): boolean {
+    return (
+      detail === 'company_uscc_unresolved' ||
+      message.includes('统一社会信用代码') ||
+      message.toUpperCase().includes('USCC')
+    );
+  }
+
+  private companyScrapeSucceeded(events: AnalyzeProgressEvent[]): boolean {
+    return events.some((event) => event.stage === 'scraping_company' && event.detail === 'success');
   }
 
   private orderOf(k: AnalyzeProgressEvent['stage']): number {
@@ -80,15 +121,19 @@ export class SubmitProgressComponent {
       next: (ev) => {
         this.events.update((prev) => [...prev, ev]);
         this.currentStage.set(ev.stage);
-        if (typeof ev.percent === 'number') this.percent.set(ev.percent);
+        if (typeof ev.percent === 'number') this.percent.set(ev.stage === 'error' ? Math.min(ev.percent, 99) : ev.percent);
         if (ev.stage === 'done' && ev.slug) {
           setTimeout(() => this.router.navigate(['/results', ev.slug!]), 600);
         }
         if (ev.stage === 'error') {
           this.errorMessage.set(ev.message);
+          this.api.refreshResults();
         }
       },
-      error: (err) => this.errorMessage.set(String(err?.message ?? err)),
+      error: (err) => {
+        this.errorMessage.set(String(err?.message ?? err));
+        this.api.refreshResults();
+      },
     });
   }
 }

@@ -59,7 +59,7 @@ if (-not (Test-Path $VenvPython)) {
 Write-Host "Checking backend dependencies..."
 $backendDepsOk = $true
 try {
-    & $VenvPython -c "import fastapi, uvicorn, httpx, websocket, bs4, lxml, openai, anthropic, dotenv" 2>$null
+    & $VenvPython -c "import fastapi, uvicorn, httpx, websocket, bs4, lxml, openai, anthropic, dotenv, requests" 2>$null
     if ($LASTEXITCODE -ne 0) {
         $backendDepsOk = $false
     }
@@ -100,7 +100,7 @@ if (-not (Test-Path (Join-Path $Root ".env"))) {
 }
 
 Write-Host "Starting JobScope backend and frontend..."
-Write-Host "Backend:  http://127.0.0.1:8000"
+Write-Host "Backend:  http://127.0.0.1:8000  (uvicorn --reload)"
 Write-Host "Frontend: http://127.0.0.1:4200"
 Write-Host ""
 
@@ -108,7 +108,7 @@ if (Test-PortListening 8000) {
     Write-Host "Backend already running on 127.0.0.1:8000; reusing it."
 } else {
     Start-Process -FilePath "cmd.exe" `
-        -ArgumentList "/k", "`"$VenvPython`" -m uvicorn web.app:app --host 127.0.0.1 --port 8000" `
+        -ArgumentList "/k", "`"$VenvPython`" -m uvicorn web.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir `"$Root`" --reload-exclude frontend/* --reload-exclude data/* --reload-exclude .venv/* --reload-exclude .chrome-debug-profile/*" `
         -WorkingDirectory $Root
 }
 

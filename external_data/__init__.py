@@ -10,8 +10,9 @@ Usage from ``main.py``::
     cleaned = clean_job_page(page)
     cleaned = enrich(cleaned)   # mutates cleaned["external"]["qcc"] if a company can be resolved
 
-If ``QCC_AUTH_BEARER`` is not set or the call fails, ``enrich`` is a no-op
-— the downstream pipeline falls back to model-only analysis.
+The pipeline only trusts unified social credit codes scraped from the job or
+company pages. Once a valid USCC is available, the company entity is treated as
+anchored and QCC is used to fetch company facts for LLM analysis.
 """
 
 try:

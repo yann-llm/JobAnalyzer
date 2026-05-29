@@ -24,6 +24,14 @@ export class FavoriteJobsService {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
   }
 
+  prune(validIds: Iterable<string>): void {
+    const valid = new Set(validIds);
+    const next = new Set([...this.favoriteIdsValue()].filter((id) => valid.has(id)));
+    if (next.size === this.favoriteIdsValue().size) return;
+    this.favoriteIdsValue.set(next);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+  }
+
   private readFavorites(): Set<string> {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);

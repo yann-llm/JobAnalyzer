@@ -13,7 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from main import analyze_url, slugify_url
+from main import analyze_url
+from pipeline.job_data import slugify_url
 from web.adapters import DATA_DIR, PROJECT_DIR, build_company, build_job_analysis, result_dirs, read_json
 
 app = FastAPI(title="Job Analysis API")
@@ -53,6 +54,9 @@ def get_result(result_id: str) -> dict[str, Any]:
     try:
         return build_job_analysis(result_id, include_details=True)
     except FileNotFoundError as exc:
+        partial_dir = DATA_DIR / result_id
+        if partial_dir.is_dir():
+            raise HTTPException(status_code=409, detail="analysis not ready") from exc
         raise HTTPException(status_code=404, detail="not found") from exc
 
 
@@ -87,28 +91,20 @@ async def stream_progress(task_id: str) -> StreamingResponse:
         raise HTTPException(status_code=404, detail="not found")
 
     async def events():
-        last_payload = None
+        next_index = 0
         while True:
             task = TASKS[task_id]
-            payload = {
-                "stage": task.get("stage", "analyzing"),
-                "message": task.get("message", ""),
-                "percent": task.get("percent", 0),
-            }
-            if task.get("detail"):
-                payload["detail"] = task["detail"]
-            if task.get("stage") == "done":
-                payload["slug"] = task.get("slug")
-            if task.get("stage") == "error" and task.get("detail"):
-                payload["detail"] = task["detail"]
-
-            encoded = json.dumps(payload, ensure_ascii=False)
-            if encoded != last_payload:
+            queued_events = task.get("events") or []
+            while next_index < len(queued_events):
+                payload = queued_events[next_index]
+                next_index += 1
+                encoded = json.dumps(payload, ensure_ascii=False)
                 if payload["stage"] == "done":
                     yield f"event: done\ndata: {encoded}\n\n"
-                    break
+                    return
                 yield f"data: {encoded}\n\n"
-                last_payload = encoded
+                if payload["stage"] == "error":
+                    return
 
             if task.get("stage") == "error":
                 break
@@ -148,6 +144,7 @@ def _create_analysis_task(
         "error": None,
         "slug": slugify_url(url),
         "refreshAnalysis": refresh_analysis,
+        "events": [],
     }
     background_tasks.add_task(_run_analysis_task, task_id, url, refresh_analysis)
     return {"taskId": task_id}
@@ -169,27 +166,66 @@ def _run_analysis_task(task_id: str, url: str, refresh_analysis: bool = False) -
     task = TASKS[task_id]
 
     def update_progress(event: dict[str, Any]) -> None:
-        task.update(
-            stage=event.get("stage", task.get("stage", "analyzing")),
-            message=event.get("message", task.get("message", "")),
-            percent=event.get("percent", task.get("percent", 0)),
-            detail=event.get("detail"),
-        )
-        if event.get("slug"):
-            task["slug"] = event["slug"]
+        _record_task_event(task, event)
 
     try:
         result = analyze_url(url, progress_callback=update_progress, refresh_analysis=refresh_analysis)
         summary = result.get("summary") or {}
         if summary.get("status") != "success":
-            task.update(
-                stage="error",
-                message=summary.get("message") or "分析失败",
-                percent=100,
-                detail=summary.get("status"),
-            )
+            detail = task.get("detail") or _failure_detail_for_summary(summary)
+            _record_task_event(task, {
+                "stage": "error",
+                "message": summary.get("message") or "分析失败",
+                "percent": task.get("percent", 0),
+                "detail": detail,
+            })
             return
         slug = Path(summary.get("output_dir") or DATA_DIR / slugify_url(url)).name
-        task.update(stage="done", message="分析完成", percent=100, done=True, slug=slug)
+        if not (DATA_DIR / slug / "analysis.json").exists():
+            _record_task_event(task, {
+                "stage": "error",
+                "message": "分析产物缺失，无法展示报告",
+                "percent": 100,
+                "detail": "analysis_missing",
+            })
+            return
+        _record_task_event(task, {"stage": "done", "message": "分析完成", "percent": 100, "slug": slug})
+        task["done"] = True
     except Exception as exc:  # noqa: BLE001
-        task.update(stage="error", message=f"分析失败：{type(exc).__name__}: {exc}", percent=100, error=str(exc))
+        _record_task_event(task, {
+            "stage": "error",
+            "message": f"分析失败：{type(exc).__name__}: {exc}",
+            "percent": 100,
+        })
+        task["error"] = str(exc)
+
+
+def _record_task_event(task: dict[str, Any], event: dict[str, Any]) -> None:
+    payload = {
+        "stage": event.get("stage", task.get("stage", "analyzing")),
+        "message": event.get("message", task.get("message", "")),
+        "percent": event.get("percent", task.get("percent", 0)),
+    }
+    if event.get("detail"):
+        payload["detail"] = event["detail"]
+    if event.get("slug"):
+        payload["slug"] = event["slug"]
+    task.update(
+        stage=payload["stage"],
+        message=payload["message"],
+        percent=payload["percent"],
+        detail=payload.get("detail"),
+    )
+    if payload.get("slug"):
+        task["slug"] = payload["slug"]
+    task.setdefault("events", []).append(payload)
+
+
+def _failure_detail_for_summary(summary: dict[str, Any]) -> str:
+    company = summary.get("company_enrichment") if isinstance(summary.get("company_enrichment"), dict) else {}
+    company_status = company.get("status")
+    if company_status in {"uscc_unresolved", "no_company_name"}:
+        return "company_uscc_unresolved"
+    if summary.get("status") == "analysis_error":
+        return "analysis_failed"
+    return str(summary.get("status") or "error")
