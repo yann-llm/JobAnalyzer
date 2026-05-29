@@ -1,14 +1,12 @@
 # job-analysis
 
-抓取一个职位 URL 的页面内容，清洗后整合企查查公司数据（若已配置），并把原始页面、清洗数据和公司信息请求结果保存到 `data/`。
-
-> 当前处于抓取 / 公司信息请求测试模式：大模型子 agent 与最终汇总流程已在 `main.py` 中屏蔽，不会调用 LLM。
+抓取一个职位 URL 的页面内容，清洗后整合企查查公司数据（若已配置），运行多 LLM 子 agent 分析，并通过 FastAPI + Angular 前端展示职位报告。
 
 抓取走 **Chrome 远程调试协议（CDP）+ 持久化 profile**：脚本自动启动一个长驻 Chrome 进程，登录一次后 cookies 永久保存在本地，后续运行无感知。
 
 项目包含两部分：
-- **Python 后端**（`main.py` + `scraper/` + `external_data/` + `analyzers/`）：CLI 抓取 + QCC 整合 + LLM 分析
-- **Angular 前端**（`frontend/`）：可视化职位分析报告与候选人画像编辑；当前吃 mock 数据独立运行，后端 API 通了之后切换即可
+- **Python 后端**（`main.py` + `web/` + `scraper/` + `external_data/` + `analyzers/`）：CLI 抓取 + QCC 整合 + LLM 分析 + FastAPI API / SSE
+- **Angular 前端**（`frontend/`）：可视化职位分析报告、提交 URL、SSE 进度展示、历史列表、公司弹窗与导出
 
 ## 为什么用 CDP（而不是 Playwright / opencli）
 
@@ -23,9 +21,14 @@
 
 ```
 job-analysis/
-├── llm.py                          ← 多 provider LLM 封装（当前主流程暂不调用）
+├── start_job_analysis.bat          ← Windows 双击启动入口
+├── start_job_analysis.ps1          ← 一键启动实际逻辑（后端 + 前端 + 浏览器）
+├── web/
+│   ├── app.py                      ← FastAPI API / SSE 入口
+│   └── adapters.py                 ← analysis.json → 前端 schema 适配层
+├── llm.py                          ← 多 provider LLM 封装
 ├── llm_config.example.json
-├── candidate_profile.example.json  ← 候选人画像模板（当前主流程暂不调用）
+├── candidate_profile.example.json  ← 候选人画像模板
 ├── main.py                         ← 总入口
 ├── scraper/
 │   ├── cdp_scraper.py              ← CDP 核心：启动 Chrome、找 tab、Runtime.evaluate
@@ -35,12 +38,11 @@ job-analysis/
 │   ├── enrich.py                   ← 清洗后、agent 前的企查查数据整合
 │   ├── company_resolver.py         ← 从页面公司名锚定唯一企业实体
 │   └── qcc_client.py               ← qcc-company / qcc-risk MCP 调用封装
-├── analyzers/                      ← LLM 分析模块（当前主流程暂时屏蔽）
+├── analyzers/                      ← LLM 分析模块
 │   ├── _shared.py                  ← 公共上下文构造（含候选人画像注入）
 │   ├── job_value_agent.py          ← 子 agent 1：职位综合价值（职责/要求/薪酬/强度多维评分）
 │   ├── company_risk_agent.py       ← 子 agent 2：公司主体健康度与风险（基于企查查）
 │   ├── industry_outlook_agent.py   ← 子 agent 3：行业与赛道前景（基于模型常识，带 provenance）
-│   ├── industry_fetcher.py         ← 行业外部数据辅助获取（暂未纳入主流程）
 │   └── final_evaluation_agent.py   ← 汇总 agent
 ├── frontend/                       ← Angular 19 + Material 前端（独立子项目）
 │   ├── src/app/
@@ -68,30 +70,75 @@ cp llm_config.example.json llm_config.json
 # 编辑 llm_config.json 填入 provider 与 api_key
 ```
 
+前端依赖首次安装：
+
+```bash
+cd frontend
+npm install
+```
+
 无需 `playwright install`，也无需安装 opencli / 浏览器扩展，只要本机已经装了 Google Chrome 或 Microsoft Edge 即可。如果可执行文件不在标准路径，可以设置环境变量 `CHROME_PATH=/path/to/chrome.exe`。
 
-### 候选人画像（暂未启用）
+### 候选人画像（可选）
 
 ```bash
 cp candidate_profile.example.json candidate_profile.json
 # 编辑这个文件，填入你的工作年限、技能、城市、薪资底线、可接受加班强度等
 ```
 
-当前主流程只做页面抓取和公司信息请求，不会读取 `candidate_profile.json`，也不会启动子 agent。`candidate_profile.json` 已加入 `.gitignore`，不会被提交到 git。
+后端分析流程会读取 `candidate_profile.json`（存在且合法时）并注入 LLM 上下文；该文件已加入 `.gitignore`，不会被提交到 git。前端候选人画像页面目前仍是占位编辑界面，保存逻辑后续再接。
 
 ### 当前数据来源说明
 
 | 数据块 | 数据来源 | 说明 |
 | --- | --- | --- |
-| raw_page / raw_page_meta | CDP 页面抓取 | 标题、正文、HTML、最终 URL、截图路径等 |
-| cleaned | 页面原文 | 清洗后的正文和快速字段抽取 |
-| external.qcc | 企查查 MCP（若配置） | 企业锚定、工商信息、风险信息；失败也会记录状态 |
+| `raw_page.html` | CDP 页面抓取 | 页面 HTML，便于排查抓取质量 |
+| `job_cleaned.json` | 页面原文 | 职位名、薪资、地点、经验、学历、描述、工商摘要等核心字段 |
+| `company.json` / `_company_cache` | 企查查 MCP（若配置） | 企业锚定、工商信息、风险信息与行业数据缓存 |
+| `analysis.json` | LLM analyzers | 职位价值、公司风险、行业前景、最终评估的结构化结果 |
 
-如果没有 `qcc_config.json`，公司信息请求会跳过，`cleaned.json` 中不会附加 `external.qcc`。
+如果没有 `qcc_config.json`，公司信息请求会跳过或只保留职位页自带的工商摘要；LLM 仍会基于已有职位信息继续分析。
 
 ## 使用流程
 
-### 首次运行
+### Windows 一键启动（推荐）
+
+双击项目根目录的：
+
+```text
+start_job_analysis.bat
+```
+
+脚本会：
+
+1. 检查 `python` 和 `npm` 是否可用。
+2. 检查项目虚拟环境 `.venv`；不存在时自动执行 `python -m venv .venv`。
+3. 检查 Python 运行依赖；缺失时使用 `.venv\Scripts\python.exe -m pip install -r requirements.txt` 安装到虚拟环境。
+4. 检查前端依赖；缺少 `frontend/node_modules/.bin/ng.cmd` 时自动执行 `npm install`。
+5. 若 `llm_config.json` 不存在，给出黄色提醒（不会阻止启动）。
+6. 若 `127.0.0.1:8000` 没有服务，使用 `.venv` 里的 Python 启动 FastAPI 后端。
+7. 若 `127.0.0.1:4200` 没有服务，启动 Angular 前端。
+8. 打开浏览器访问 `http://127.0.0.1:4200`。
+
+启动后会留下两个服务窗口：
+
+| 窗口 | 用途 | 关闭后果 |
+| --- | --- | --- |
+| JobScope API | FastAPI 后端 `:8000` | 前端无法请求接口 |
+| JobScope Frontend | Angular dev server `:4200` | 页面无法访问 |
+
+重复点击脚本时，如果端口已有服务，会直接复用，不会再启动第二个前端服务。
+
+### 前端分析流程
+
+1. 打开 `http://127.0.0.1:4200`。
+2. 粘贴 BOSS 直聘职位 URL。
+3. 点击「开始分析」。
+4. 前端提交 `POST /api/analyze`，随后通过 SSE 订阅 `/api/analyze/{taskId}/stream`。
+5. 完成后自动跳转 `/results/:slug`，历史列表自动刷新。
+6. 点击「重新分析」会调用 `POST /api/results/{id}/reanalyze`，重新跑抓取和 LLM 分析；公司 / QCC 缓存未过期时会继续复用。
+
+### CLI 首次运行
 
 ```bash
 python main.py "https://www.zhipin.com/job_detail/xxx.html"
@@ -102,7 +149,7 @@ python main.py "https://www.zhipin.com/job_detail/xxx.html"
 1. 探测 `127.0.0.1:9222`，不在 → 用 `--remote-debugging-port=9222 --user-data-dir=.chrome-debug-profile/` 启动一个**可见的** Chrome 窗口，并直接打开目标 URL。
 2. 检测到页面被跳转到登录页 → 在终端提示「请在 Chrome 窗口完成登录」。
 3. 你登录完成后，脚本自动检测 URL 不再含 `/login`/`/web/user` 等关键字，再用 `Page.navigate` 把 tab 导回目标 URL。
-4. 抓取 title / text / html → 清洗文本 → 若配置 `qcc_config.json`，调用企查查整合公司工商 / 风险数据 → 保存到 `data/<host_path>/`。
+4. 抓取 title / text / html → 清洗文本 → 若配置 `qcc_config.json`，调用企查查整合公司工商 / 风险数据 → 运行 LLM 分析 → 保存到 `data/<host_path>/`。
 
 登录态保存在 `.chrome-debug-profile/`，**仅此一次**。
 
@@ -122,8 +169,9 @@ python main.py "https://www.zhipin.com/job_detail/another.html"
 | `--profile-dir PATH` | 覆盖默认 profile 目录（默认 `.chrome-debug-profile/`） |
 | `--port N` | 覆盖 CDP 端口（默认 9222） |
 | `--no-existing-tab` | 不复用已打开的 tab，强制新开 |
-| `--no-screenshot` | 跳过整页截图 |
+| `--screenshot` | 保存整页截图 |
 | `--login-wait SEC` | 等待用户首次登录的最大秒数（默认 600） |
+| `--no-analysis` | 只抓取和整合公司数据，不运行 LLM 分析 |
 
 ## 输出
 
@@ -132,21 +180,17 @@ python main.py "https://www.zhipin.com/job_detail/another.html"
 | 文件 | 含义 |
 | --- | --- |
 | `raw_page.html` | 通过 CDP 拿到的页面 HTML（最多 400k 字符） |
-| `raw_page_meta.json` | URL、final_url、标题、CDP 元数据（tab_source、launched_chrome 等） |
-| `cleaned.json` | 清洗后的页面文本 + 字段快速抽取 + `external.qcc` 公司外部数据（若配置并成功/失败均会记录状态） |
-| `qcc_raw.json` | QCC 锚定、工商、风险 tool 的完整原始结果汇总（仅在触发 QCC 请求时生成） |
-| `summary.json` | 本次抓取与公司信息请求状态摘要 |
-| `screenshot/job_*.png` | 全页截图（默认开启） |
-
-## 当前测试模式
-
-`main.py` 目前不会启动 `analyzers/` 下的子 agent，也不会生成 `analysis_*.json`。运行结果集中保存在 `raw_page.html`、`raw_page_meta.json`、`cleaned.json` 和 `summary.json` 中。
+| `job_cleaned.json` | 前端 / analyzer 使用的职位核心字段 |
+| `company.json` | 公司缓存引用（USCC、公司名、缓存路径） |
+| `analysis.json` | 4 个 analyzer + final evaluation 的完整 LLM 结果 |
+| `screenshot/job_*.png` | 全页截图（仅 `--screenshot` 时生成） |
+| `data/_company_cache/<USCC>.json` | QCC / 行业数据缓存，按 TTL 复用 |
 
 ## 前端（Angular）
 
 `frontend/` 目录是一个独立的 Angular 19 + Material 应用，把 `data/` 下的分析产物渲染成可视化报告，并提供 URL 提交、SSE 进度展示、候选人画像编辑等交互入口。
 
-后端 API（FastAPI）还未实装时，前端默认走 **mock 模式**，直接吃内置静态数据就能跑出完整 UI；后端通了之后只需切 `useMock` 开关。
+前端当前默认连接真实 FastAPI API（`useMock: false`）。如需离线开发 UI，可临时切回 mock 模式。
 
 ### 环境
 
@@ -155,7 +199,7 @@ python main.py "https://www.zhipin.com/job_detail/another.html"
 ```bash
 cd frontend
 npm install        # 首次安装依赖
-npx ng serve       # 启动开发服务器
+npm start -- --host 127.0.0.1 --port 4200
 # → http://127.0.0.1:4200
 ```
 
@@ -174,13 +218,13 @@ npx ng serve       # 启动开发服务器
 
 ```ts
 export const environment = {
-  useMock: true,                      // 改成 false 走真实 API
+  useMock: false,                     // true 走 mock；false 走真实 API
   apiBase: 'http://127.0.0.1:8000',  // FastAPI 后端地址
 };
 ```
 
 - mock 数据来源：`frontend/src/app/core/mock/jobs.mock.ts`（与设计稿 `index.html` 的 `JOBS` / `COMPANIES` 完全对齐，3 个职位 + 3 家公司）
-- 后端 schema 稳定后，统一在 `frontend/src/app/core/services/api.service.ts` 里加 adapter 把后端响应映射为前端 `JobAnalysis` / `Company` 类型，组件代码不动
+- 真实数据来源：FastAPI 读取 `data/<slug>/analysis.json`、`job_cleaned.json`、`company.json`，经 `web/adapters.py` 转成前端 `JobAnalysis` / `Company` 类型
 
 ### 视觉风格
 
@@ -209,4 +253,7 @@ npx ng build --configuration development  # 开发构建（带 source map）
 通常是在错误的目录跑 `npx ng ...`。`@angular/cli` 只装在 `frontend/node_modules/` 下，必须先 `cd frontend` 再跑命令。如果 `frontend/node_modules/` 为空，先 `npm install`。
 
 **Q: 前端报错或样式异常，但 mock 数据没改？**
-检查 `frontend/src/environments/environment.ts` 的 `useMock` 是不是被切到了 `false` —— 此时会去打真实 API，但后端尚未实装，请求都会失败。开发期保持 `useMock: true` 即可。
+检查 `frontend/src/environments/environment.ts` 的 `useMock` 和 `apiBase`。当前默认 `useMock: false`，需要先启动 FastAPI 后端；离线开发 UI 时可临时改成 `useMock: true`。
+
+**Q: 双击启动脚本后出现两个前端服务？**
+新版 `start_job_analysis.ps1` 会先检测 `127.0.0.1:4200`，如果已有前端服务就复用。若旧窗口还开着，关闭多余的 `JobScope Frontend` 命令行窗口即可。
