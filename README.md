@@ -1,5 +1,7 @@
 # job-analysis
 
+![job-analysis cover](https://img.ylaizxx.cn/2feaa32d-bcc4-4747-86dd-f2c498f064b3.avif)
+
 抓取一个职位 URL 的页面内容，清洗后整合企查查公司数据（若已配置），运行多 LLM 子 agent 分析，并通过 FastAPI + Angular 前端展示职位报告。
 
 抓取走 **Chrome 远程调试协议（CDP）+ 持久化 profile**：脚本自动启动一个长驻 Chrome 进程，登录一次后 cookies 永久保存在本地，后续运行无感知。
