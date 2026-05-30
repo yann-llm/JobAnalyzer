@@ -143,7 +143,7 @@ export class ApiService {
 
   private mockProgressStream(): Observable<AnalyzeProgressEvent> {
     const sequence: AnalyzeProgressEvent[] = [
-      { stage: 'launching_chrome', message: '启动 Chrome 调试实例...', percent: 5 },
+      { stage: 'launching_chrome', message: '浏览器', percent: 5 },
       { stage: 'scraping_job', message: '抓取职位页面正文', percent: 25 },
       { stage: 'scraping_company', message: '抓取公司详情页', percent: 45 },
       { stage: 'qcc_enrich', message: '企查查公司信息整合', percent: 60 },

@@ -59,9 +59,8 @@ def analyze_url(
 
     print(f"[抓取] {url}")
     print(f"[抓取] Chrome profile: {profile_path}  port: {port}")
-    emit_progress(progress_callback, "launching_chrome", "启动 Chrome 调试实例", 5)
+    emit_progress(progress_callback, "launching_chrome", "启动浏览器", 5)
     try:
-        emit_progress(progress_callback, "scraping_job", "抓取职位页面正文", 20)
         page = fetch_job_page(
             url,
             profile_dir=profile_path,

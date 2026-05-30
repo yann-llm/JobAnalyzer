@@ -14,7 +14,6 @@ interface StageRow {
 type StageStatus = 'pending' | 'active' | 'done' | 'error';
 
 const STAGES: StageRow[] = [
-  { key: 'launching_chrome', label: '启动 Chrome 调试实例' },
   { key: 'waiting_login',    label: '等待用户登录（如触发）' },
   { key: 'scraping_job',     label: '抓取职位页面正文' },
   { key: 'scraping_company', label: '抓取公司详情页' },
@@ -71,9 +70,15 @@ export class SubmitProgressComponent {
   ): StageStatus {
     if (current === 'error') {
       if (key === failedStage) return 'error';
+      if (key === 'waiting_login') return this.loginSucceeded(events) ? 'done' : 'pending';
       if (key === 'scraping_company') return this.companyScrapeSucceeded(events) ? 'done' : 'pending';
       if (failedStage && reached.has(key) && this.orderOf(key) < this.orderOf(failedStage)) return 'done';
       return 'pending';
+    }
+    if (key === 'waiting_login') {
+      if (this.loginSucceeded(events)) return 'done';
+      if (current === 'waiting_login') return 'active';
+      return reached.has(key) ? 'done' : 'pending';
     }
     if (key === 'scraping_company') {
       if (this.companyScrapeSucceeded(events)) return 'done';
@@ -109,8 +114,23 @@ export class SubmitProgressComponent {
     return events.some((event) => event.stage === 'scraping_company' && event.detail === 'success');
   }
 
+  private loginSucceeded(events: AnalyzeProgressEvent[]): boolean {
+    return events.some((event) => event.stage === 'waiting_login' && event.detail === 'success');
+  }
+
   private orderOf(k: AnalyzeProgressEvent['stage']): number {
     return STAGES.findIndex((s) => s.key === k);
+  }
+
+  private shouldPromoteCurrent(event: AnalyzeProgressEvent): boolean {
+    if (this.orderOf(event.stage) < 0 && event.stage !== 'error' && event.stage !== 'done') return false;
+    const current = this.currentStage();
+    if (!current || event.stage === 'error' || event.stage === 'done') return true;
+    const currentOrder = this.orderOf(current);
+    const nextOrder = this.orderOf(event.stage);
+    if (nextOrder > currentOrder) return true;
+    if (nextOrder === currentOrder) return true;
+    return false;
   }
 
   ngOnInit(): void {
@@ -120,8 +140,12 @@ export class SubmitProgressComponent {
     this.api.streamProgress(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (ev) => {
         this.events.update((prev) => [...prev, ev]);
-        this.currentStage.set(ev.stage);
-        if (typeof ev.percent === 'number') this.percent.set(ev.stage === 'error' ? Math.min(ev.percent, 99) : ev.percent);
+        if (this.shouldPromoteCurrent(ev)) {
+          this.currentStage.set(ev.stage);
+        }
+        if (typeof ev.percent === 'number') {
+          this.percent.set(ev.stage === 'error' ? Math.min(ev.percent, 99) : Math.max(this.percent(), ev.percent));
+        }
         if (ev.stage === 'done' && ev.slug) {
           setTimeout(() => this.router.navigate(['/results', ev.slug!]), 600);
         }

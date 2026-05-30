@@ -107,16 +107,19 @@ Write-Host ""
 if (Test-PortListening 8000) {
     Write-Host "Backend already running on 127.0.0.1:8000; reusing it."
 } else {
+    $backendCommand = "`"$VenvPython`" -m uvicorn web.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir `"web`" --reload-dir `"pipeline`" --reload-dir `"scraper`" --reload-dir `"external_data`" --reload-dir `"analyzers`""
+    Write-Host "Backend command: $backendCommand"
     Start-Process -FilePath "cmd.exe" `
-        -ArgumentList "/k", "`"$VenvPython`" -m uvicorn web.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir `"$Root`" --reload-exclude frontend/* --reload-exclude data/* --reload-exclude .venv/* --reload-exclude .chrome-debug-profile/*" `
+        -ArgumentList "/k", "`"$backendCommand`"" `
         -WorkingDirectory $Root
 }
 
 if (Test-PortListening 4200) {
     Write-Host "Frontend already running on 127.0.0.1:4200; reusing it."
 } else {
+    $frontendCommand = "npm start -- --host 127.0.0.1 --port 4200"
     Start-Process -FilePath "cmd.exe" `
-        -ArgumentList "/k", "npm start -- --host 127.0.0.1 --port 4200" `
+        -ArgumentList "/k", "`"$frontendCommand`"" `
         -WorkingDirectory $Frontend
 }
 

@@ -676,6 +676,13 @@ def fetch_via_cdp(
         settled_url = wait_for_login_completion(
             target_id, port=port, timeout=login_wait_timeout,
         )
+        if progress_callback:
+            progress_callback({
+                "stage": "waiting_login",
+                "message": "登录完成，继续抓取职位页面",
+                "percent": 18,
+                "detail": "success",
+            })
         # After login the site often lands on a different page (e.g. /web/geek/jobs);
         # navigate back to the original URL so extraction sees the job detail.
         if url not in settled_url:
@@ -684,6 +691,14 @@ def fetch_via_cdp(
                 target_id, port=port, timeout=settle_timeout, stable_seconds=settle_seconds,
             )
             meta["renavigated_to"] = url
+    else:
+        if progress_callback:
+            progress_callback({
+                "stage": "waiting_login",
+                "message": "已检测到登录态，继续抓取职位页面",
+                "percent": 18,
+                "detail": "success",
+            })
 
     meta["settled_url"] = settled_url
     meta["login_redirect"] = looks_like_login_redirect(settled_url)
@@ -693,5 +708,11 @@ def fetch_via_cdp(
     # Tiny extra wait so client-rendered detail blocks (job-detail, etc.)
     # finish painting before we read innerText.
     time.sleep(1.0)
+    if progress_callback:
+        progress_callback({
+            "stage": "scraping_job",
+            "message": "抓取职位页面正文",
+            "percent": 25,
+        })
     result = extract_page_content(target_id, port=port)
     return result, meta

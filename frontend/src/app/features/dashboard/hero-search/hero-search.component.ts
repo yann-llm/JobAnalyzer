@@ -4,6 +4,7 @@ import {
   DestroyRef,
   ElementRef,
   computed,
+  effect,
   inject,
   input,
   signal,
@@ -52,6 +53,12 @@ export class HeroSearchComponent {
     }
     return { background: 'var(--green-bg)', color: 'var(--green-text)' };
   });
+
+  constructor() {
+    effect(() => {
+      this.urlInput.set(this.job().sourceUrl ?? '');
+    });
+  }
 
   submit(): void {
     const url = this.urlInput().trim();

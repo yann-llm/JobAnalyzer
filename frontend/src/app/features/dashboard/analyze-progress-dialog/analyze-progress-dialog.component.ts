@@ -19,7 +19,6 @@ interface StageRow {
 type StageStatus = 'pending' | 'active' | 'done' | 'error';
 
 const STAGES: StageRow[] = [
-  { key: 'launching_chrome', label: '启动 Chrome' },
   { key: 'waiting_login', label: '等待登录' },
   { key: 'scraping_job', label: '抓取职位' },
   { key: 'scraping_company', label: '抓取公司' },
@@ -29,6 +28,7 @@ const STAGES: StageRow[] = [
 ];
 
 const DETAIL_LABELS: Record<string, string> = {
+  success: '已完成',
   job_value: '职位综合价值',
   company_risk: '公司风险',
   industry_outlook: '行业前景',
@@ -97,10 +97,12 @@ export class AnalyzeProgressDialogComponent {
 
   private handleEvent(event: AnalyzeProgressEvent): void {
     this.events.update((prev) => [...prev, event]);
-    this.currentEvent.set(event);
+    if (this.shouldPromoteCurrent(event)) {
+      this.currentEvent.set(event);
+    }
     if (typeof event.percent === 'number') {
       const nextPercent = Math.max(0, Math.min(100, event.percent));
-      this.percent.set(event.stage === 'error' ? Math.min(nextPercent, 99) : nextPercent);
+      this.percent.set(event.stage === 'error' ? Math.min(nextPercent, 99) : Math.max(this.percent(), nextPercent));
     }
     if (event.stage === 'error') {
       this.errorMessage.set(event.message);
@@ -126,9 +128,15 @@ export class AnalyzeProgressDialogComponent {
   ): StageStatus {
     if (current === 'error') {
       if (key === failedStage) return 'error';
+      if (key === 'waiting_login') return this.loginSucceeded(events) ? 'done' : 'pending';
       if (key === 'scraping_company') return this.companyScrapeSucceeded(events) ? 'done' : 'pending';
       if (failedStage && reached.has(key) && this.orderOf(key) < this.orderOf(failedStage)) return 'done';
       return 'pending';
+    }
+    if (key === 'waiting_login') {
+      if (this.loginSucceeded(events)) return 'done';
+      if (current === 'waiting_login') return 'active';
+      return reached.has(key) ? 'done' : 'pending';
     }
     if (key === 'scraping_company') {
       if (this.companyScrapeSucceeded(events)) return 'done';
@@ -164,7 +172,22 @@ export class AnalyzeProgressDialogComponent {
     return events.some((event) => event.stage === 'scraping_company' && event.detail === 'success');
   }
 
+  private loginSucceeded(events: AnalyzeProgressEvent[]): boolean {
+    return events.some((event) => event.stage === 'waiting_login' && event.detail === 'success');
+  }
+
   private orderOf(key: AnalyzeProgressEvent['stage']): number {
     return STAGES.findIndex((stage) => stage.key === key);
+  }
+
+  private shouldPromoteCurrent(event: AnalyzeProgressEvent): boolean {
+    if (this.orderOf(event.stage) < 0 && event.stage !== 'error' && event.stage !== 'done') return false;
+    const current = this.currentEvent();
+    if (!current || event.stage === 'error' || event.stage === 'done') return true;
+    const currentOrder = this.orderOf(current.stage);
+    const nextOrder = this.orderOf(event.stage);
+    if (nextOrder > currentOrder) return true;
+    if (nextOrder === currentOrder) return true;
+    return false;
   }
 }
